@@ -556,36 +556,41 @@ app.post('/verify-current-password', authenticateToken, async (req, res) => {
 });
 
 // 1. Send verification code for password change
-app.post('/send-password-change-code', authenticateToken, async (req, res) => {
+app.post("/send-password-change-code", authenticateToken, async (req, res) => {
   try {
     const { email } = req.body;
+
 
     // Verify user exists and get full name
     const query = `
       SELECT p.firstName, p.middleName, p.lastName, p.nameExtension,
-             CONCAT(p.firstName, 
+             CONCAT(p.firstName,
                     CASE WHEN p.middleName IS NOT NULL THEN CONCAT(' ', p.middleName) ELSE '' END,
                     ' ', p.lastName,
                     CASE WHEN p.nameExtension IS NOT NULL THEN CONCAT(' ', p.nameExtension) ELSE '' END
              ) as fullName
-      FROM users u 
-      LEFT JOIN person_table p ON u.employeeNumber = p.agencyEmployeeNum 
+      FROM users u
+      LEFT JOIN person_table p ON u.employeeNumber = p.agencyEmployeeNum
       WHERE u.email = ?
     `;
 
+
     db.query(query, [email], async (err, result) => {
       if (err) {
-        console.error('DB error:', err);
-        return res.status(500).json({ error: 'Database error' });
+        console.error("DB error:", err);
+        return res.status(500).json({ error: "Database error" });
       }
       if (result.length === 0) {
-        return res.status(404).json({ error: 'User not found' });
+        return res.status(404).json({ error: "User not found" });
       }
+
 
       const user = result[0];
 
+
       // Generate 6-digit code
       const code = Math.floor(100000 + Math.random() * 900000).toString();
+
 
       // Store in the same Map you use for forgot-password
       verificationCodes.set(email, {
@@ -593,12 +598,13 @@ app.post('/send-password-change-code', authenticateToken, async (req, res) => {
         expires: Date.now() + 10 * 60 * 1000, // 10 minutes
       });
 
+
       // Send email
       try {
         await transporter.sendMail({
           from: process.env.GMAIL_USER,
           to: email,
-          subject: 'Password Change Verification Code',
+          subject: "Password Change Verification Code",
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
               <h2 style="color: #A31D1D;">Password Change Request</h2>
@@ -615,98 +621,117 @@ app.post('/send-password-change-code', authenticateToken, async (req, res) => {
           `,
         });
 
-        res.json({ message: 'Verification code sent successfully' });
+
+        res.json({ message: "Verification code sent successfully" });
       } catch (emailErr) {
-        console.error('Email send error:', emailErr);
-        res.status(500).json({ error: 'Failed to send email' });
+        console.error("Email send error:", emailErr);
+        res.status(500).json({ error: "Failed to send email" });
       }
     });
   } catch (error) {
-    console.error('Error sending password change code:', error);
-    res.status(500).json({ error: 'Failed to send verification code' });
+    console.error("Error sending password change code:", error);
+    res.status(500).json({ error: "Failed to send verification code" });
   }
 });
 
+
 // 2. Verify the code (reuses your existing verificationCodes Map)
-app.post('/verify-password-change-code', async (req, res) => {
+app.post("/verify-password-change-code", async (req, res) => {
   try {
     const { email, code } = req.body;
 
+
     const storedData = verificationCodes.get(email);
+
 
     if (!storedData) {
       return res.status(400).json({
-        error: 'No verification code found. Please request a new one.',
+        error: "No verification code found. Please request a new one.",
       });
     }
+
 
     if (Date.now() > storedData.expires) {
       verificationCodes.delete(email);
       return res.status(400).json({
-        error: 'Verification code has expired. Please request a new one.',
+        error: "Verification code has expired. Please request a new one.",
       });
     }
 
+
     if (storedData.code !== code) {
-      return res.status(400).json({ error: 'Invalid verification code' });
+      return res.status(400).json({ error: "Invalid verification code" });
     }
 
-    res.json({ verified: true, message: 'Code verified successfully' });
+
+    res.json({ verified: true, message: "Code verified successfully" });
   } catch (error) {
-    console.error('Error verifying code:', error);
-    res.status(500).json({ error: 'Verification failed' });
+    console.error("Error verifying code:", error);
+    res.status(500).json({ error: "Verification failed" });
   }
 });
 
+
 // 3. Complete password change after verification
-app.post('/complete-password-change', async (req, res) => {
+app.post("/complete-password-change", async (req, res) => {
   try {
     const { email, newPassword, confirmPassword } = req.body;
 
+
     // Validate
     if (newPassword !== confirmPassword) {
-      return res.status(400).json({ error: 'Passwords do not match' });
+      return res.status(400).json({ error: "Passwords do not match" });
     }
+
 
     if (newPassword.length < 6) {
       return res
         .status(400)
-        .json({ error: 'Password must be at least 6 characters' });
+        .json({ error: "Password must be at least 6 characters" });
     }
+
 
     // Verify code was validated (still exists in Map)
     const storedData = verificationCodes.get(email);
     if (!storedData) {
       return res
         .status(400)
-        .json({ error: 'Invalid or expired session. Please start over.' });
+        .json({ error: "Invalid or expired session. Please start over." });
     }
+
 
     // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Update password in MySQL
-    const query = 'UPDATE users SET password = ? WHERE email = ?';
+
+    // Update password AND set isDefaultPassword to 0 in MySQL
+    const query = "UPDATE users SET password = ?, isDefaultPassword = 0 WHERE email = ?";
     db.query(query, [hashedPassword, email], (err, result) => {
       if (err) {
-        console.error('Database error:', err);
-        return res.status(500).json({ error: 'Failed to update password' });
+        console.error("Database error:", err);
+        return res.status(500).json({ error: "Failed to update password" });
       }
 
+
       if (result.affectedRows === 0) {
-        return res.status(404).json({ error: 'User not found' });
+        return res.status(404).json({ error: "User not found" });
       }
+
 
       // Clean up verification code
       verificationCodes.delete(email);
 
-      res.json({ message: 'Password changed successfully' });
+
+      res.json({ message: "Password changed successfully" });
     });
   } catch (error) {
-    console.error('Error changing password:', error);
-    res.status(500).json({ error: 'Server error' });
+    console.error("Error changing password:", error);
+    res.status(500).json({ error: "Server error" });
   }
 });
+
+
+
 
 // REGISTER - Updated with email notification
 app.post('/register', async (req, res) => {
@@ -1994,46 +2019,56 @@ app.post('/verify-2fa-code', (req, res) => {
 });
 
 // complete login (issue JWT) - Updated to get full name from person_table
-app.post('/complete-2fa-login', (req, res) => {
+app.post("/complete-2fa-login", (req, res) => {
   const { email, employeeNumber } = req.body;
+
 
   // Join to get full name from person_table
   const query = `
-    SELECT u.*, 
-           p.firstName, 
-           p.middleName, 
-           p.lastName, 
+    SELECT u.*,
+           p.firstName,
+           p.middleName,
+           p.lastName,
            p.nameExtension,
-           CONCAT(p.firstName, 
+           CONCAT(p.firstName,
                   CASE WHEN p.middleName IS NOT NULL THEN CONCAT(' ', p.middleName) ELSE '' END,
                   ' ', p.lastName,
                   CASE WHEN p.nameExtension IS NOT NULL THEN CONCAT(' ', p.nameExtension) ELSE '' END
            ) as fullName
-    FROM users u 
-    LEFT JOIN person_table p ON u.employeeNumber = p.agencyEmployeeNum 
+    FROM users u
+    LEFT JOIN person_table p ON u.employeeNumber = p.agencyEmployeeNum
     WHERE u.email = ? OR u.employeeNumber = ?
   `;
 
+
   db.query(query, [email, employeeNumber], (err, result) => {
     if (err) {
-      console.error('Database error:', err);
-      return res.status(500).json({ error: 'Database error' });
+      console.error("Database error:", err);
+      return res.status(500).json({ error: "Database error" });
     }
 
+
     if (result.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ error: "User not found" });
     }
+
 
     const user = result[0];
 
+
     // Clean up the 2FA code since login is successful
     delete twoFACodes[email];
+
+
+    // Check if user has default password
+    const isDefaultPassword = user.isDefaultPassword === 1 || user.isDefaultPassword === true;
+
 
     // Generate JWT with actual user data including full name
     const token = jwt.sign(
       {
         id: user.id,
-        username: user.fullName, // Using constructed full name
+        username: user.fullName,
         employeeNumber: user.employeeNumber,
         email: user.email,
         role: user.role,
@@ -2042,23 +2077,27 @@ app.post('/complete-2fa-login', (req, res) => {
         lastName: user.lastName,
         nameExtension: user.nameExtension,
       },
-      process.env.JWT_SECRET || 'secret',
-      { expiresIn: '10h' }
+      process.env.JWT_SECRET || "secret",
+      { expiresIn: "10h" }
     );
+
 
     res.json({
       token,
       role: user.role,
       employeeNumber: user.employeeNumber,
       email: user.email,
-      username: user.fullName, // Full name as username
+      username: user.fullName,
       firstName: user.firstName,
       middleName: user.middleName,
       lastName: user.lastName,
       nameExtension: user.nameExtension,
+      isDefaultPassword: isDefaultPassword
     });
   });
 });
+
+
 
 //data
 app.get('/data', (req, res) => {
