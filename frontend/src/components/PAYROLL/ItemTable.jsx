@@ -1,5 +1,5 @@
 import API_BASE_URL from '../../apiConfig';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import {
   Container,
@@ -11,9 +11,20 @@ import {
   Chip,
   Modal,
   IconButton,
+  CircularProgress,
+  Snackbar,
+  Alert,
+  Paper,
+  ToggleButton,
+  ToggleButtonGroup,
+  List,
+  ListItem,
+  ListItemText,
+  Card,
+  CardContent,
   FormControl,
-} from '@mui/material';
-import Autocomplete from '@mui/material/Autocomplete';
+  Autocomplete
+} from "@mui/material";
 import {
   Add as AddIcon,
   Edit as EditIcon,
@@ -21,18 +32,296 @@ import {
   Save as SaveIcon,
   Cancel as CancelIcon,
   Close,
-} from '@mui/icons-material';
+  Search as SearchIcon,
+  ViewList as ViewListIcon,
+  ViewModule as ViewModuleIcon,
+  Label as FactCheckIcon,
+  Person as PersonIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+} from "@mui/icons-material";
 
-
-import LabelIcon from '@mui/icons-material/Label';
-import SearchIcon from '@mui/icons-material/Search';
 import ReorderIcon from '@mui/icons-material/Reorder';
 import LoadingOverlay from '../LoadingOverlay';
 import SuccessfullOverlay from '../SuccessfulOverlay';
+import AccessDenied from '../AccessDenied';
+import { useNavigate } from "react-router-dom";
 
+// Auth header helper
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('token');
+  return {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  };
+};
+
+// Employee Autocomplete Component
+const EmployeeAutocomplete = ({
+  value,
+  onChange,
+  placeholder = 'Search employee...',
+  required = false,
+  disabled = false,
+  error = false,
+  helperText = '',
+  selectedEmployee,
+  onEmployeeSelect,
+  dropdownDisabled = false,
+}) => {
+  const [query, setQuery] = useState('');
+  const [employees, setEmployees] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const debounceRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (value && !selectedEmployee) {
+      fetchEmployeeById(value);
+    }
+  }, [value]);
+
+  useEffect(() => {
+    if (selectedEmployee) {
+      setQuery(selectedEmployee.name || '');
+    } else if (!value) {
+      setQuery('');
+    }
+  }, [selectedEmployee, value]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const fetchEmployees = async (searchQuery) => {
+    setIsLoading(true);
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/Remittance/employees/search?q=${encodeURIComponent(searchQuery)}`,
+        getAuthHeaders()
+      );
+      setEmployees(response.data);
+    } catch (error) {
+      console.error('Error fetching employees:', error);
+      setEmployees([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchAllEmployees = async () => {
+    setIsLoading(true);
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/Remittance/employees/search`,
+        getAuthHeaders()
+      );
+      setEmployees(response.data);
+    } catch (error) {
+      console.error('Error fetching employees:', error);
+      setEmployees([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchEmployeeById = async (employeeNumber) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/Remittance/employees/${employeeNumber}`,
+        getAuthHeaders()
+      );
+      const employee = response.data;
+      onEmployeeSelect(employee);
+      setQuery(employee.name || '');
+    } catch (error) {
+      console.error('Error fetching employee by ID:', error);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const inputValue = e.target.value;
+    setQuery(inputValue);
+    setShowDropdown(true);
+
+    if (selectedEmployee && inputValue !== selectedEmployee.name) {
+      onEmployeeSelect(null);
+      onChange('');
+    }
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    debounceRef.current = setTimeout(() => {
+      if (inputValue.trim().length >= 2) {
+        fetchEmployees(inputValue);
+      } else if (inputValue.trim().length === 0) {
+        fetchAllEmployees();
+      } else {
+        setEmployees([]);
+      }
+    }, 300);
+  };
+
+  const handleEmployeeSelect = (employee) => {
+    onEmployeeSelect(employee);
+    setQuery(employee.name);
+    setShowDropdown(false);
+    onChange(employee.employeeNumber);
+  };
+
+  const handleInputFocus = () => {
+    setShowDropdown(true);
+    if (employees.length === 0 && !isLoading) {
+      if (query.length >= 2) {
+        fetchEmployees(query);
+      } else {
+        fetchAllEmployees();
+      }
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Escape') {
+      setShowDropdown(false);
+    }
+  };
+
+  const handleDropdownClick = () => {
+    if (!showDropdown) {
+      setShowDropdown(true);
+      if (employees.length === 0 && !isLoading) {
+        fetchAllEmployees();
+      }
+    } else {
+      setShowDropdown(false);
+    }
+  };
+
+  return (
+    <Box sx={{ position: 'relative', width: '100%' }} ref={dropdownRef}>
+      <TextField
+        ref={inputRef}
+        value={query}
+        onChange={handleInputChange}
+        onFocus={handleInputFocus}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        disabled={disabled}
+        required={required}
+        error={error}
+        helperText={helperText}
+        fullWidth
+        autoComplete="off"
+        size="small"
+        InputProps={{
+          startAdornment: <PersonIcon sx={{ color: '#6D2323', mr: 1 }} />,
+          endAdornment: (
+            <IconButton
+              onClick={dropdownDisabled ? undefined : handleDropdownClick}
+              size="small"
+              disabled={dropdownDisabled}
+              sx={{ color: '#6D2323' }}
+            >
+              {showDropdown ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            </IconButton>
+          ),
+        }}
+        sx={{
+          '& .MuiOutlinedInput-root': {
+            height: '40px',
+            '& fieldset': {
+              borderColor: error ? 'red' : '#6D2323',
+              borderWidth: '1.5px'
+            },
+            '&:hover fieldset': {
+              borderColor: error ? 'red' : '#6D2323',
+            },
+            '&.Mui-focused fieldset': {
+              borderColor: error ? 'red' : '#6D2323',
+            },
+          },
+        }}
+      />
+
+      {showDropdown && (
+        <Paper
+          elevation={3}
+          sx={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            zIndex: 1000,
+            maxHeight: 300,
+            overflow: 'auto',
+            mt: 1,
+          }}
+        >
+          {isLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+              <CircularProgress size={20} />
+              <Typography variant="body2" sx={{ ml: 1 }}>
+                Loading...
+              </Typography>
+            </Box>
+          ) : employees.length > 0 ? (
+            <List dense>
+              {employees.map((employee) => (
+                <ListItem
+                  key={employee.employeeNumber}
+                  button
+                  onClick={() => handleEmployeeSelect(employee)}
+                  sx={{
+                    '&:hover': {
+                      backgroundColor: '#f5f5f5',
+                    },
+                  }}
+                >
+                  <ListItemText
+                    primary={employee.name}
+                    secondary={`#${employee.employeeNumber}`}
+                    primaryTypographyProps={{ fontWeight: 'bold' }}
+                    secondaryTypographyProps={{ color: '#666' }}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          ) : query.length >= 2 ? (
+            <Box sx={{ p: 2, textAlign: 'center' }}>
+              <Typography variant="body2" color="textSecondary">
+                No employees found matching "{query}"
+              </Typography>
+            </Box>
+          ) : (
+            <Box sx={{ p: 2, textAlign: 'center' }}>
+              <Typography variant="body2" color="textSecondary">
+                {employees.length === 0
+                  ? 'No employees available'
+                  : 'Type to search or scroll to browse'}
+              </Typography>
+            </Box>
+          )}
+        </Paper>
+      )}
+    </Box>
+  );
+};
 
 const ItemTable = () => {
   const [data, setData] = useState([]);
+  const [employeeNames, setEmployeeNames] = useState({});
   const [newItem, setNewItem] = useState({
     item_description: '',
     employeeID: '',
@@ -43,59 +332,118 @@ const ItemTable = () => {
     effectivityDate: '',
   });
   const [editItem, setEditItem] = useState(null);
-  const [originalItem, setOriginalItem] = useState(null); // Store original data for cancel
-  const [isEditing, setIsEditing] = useState(false); // Track edit mode
+  const [originalItem, setOriginalItem] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
-  const [successAction, setSuccessAction] = useState('');
+  const [successAction, setSuccessAction] = useState("");
+  const [errors, setErrors] = useState({});
+  const [viewMode, setViewMode] = useState('grid');
+  
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [selectedEditEmployee, setSelectedEditEmployee] = useState(null);
+  
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
 
-
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
-    console.log(
-      'Token from localStorage:',
-      token ? 'Token exists' : 'No token found'
-    );
-    if (token) {
-      console.log('Token length:', token.length);
-      console.log('Token starts with:', token.substring(0, 20) + '...');
-    }
-    return {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    };
+  const showSnackbar = (message, severity = 'success') => {
+    setSnackbar({ open: true, message, severity });
   };
 
+  const [hasAccess, setHasAccess] = useState(null);
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    const userId = localStorage.getItem('employeeNumber');
+    const pageId = 10; // Different page ID for items
+    if (!userId) {
+      setHasAccess(false);
+      return;
+    }
+    const checkAccess = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/page_access/${userId}`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
+        if (response.ok) {
+          const accessData = await response.json();
+          const hasPageAccess = accessData.some(access => 
+            access.page_id === pageId && String(access.page_privilege) === '1'
+          );
+          setHasAccess(hasPageAccess);
+        } else {
+          setHasAccess(false);
+        }
+      } catch (error) {
+        console.error('Error checking access:', error);
+        setHasAccess(false);
+      }
+    };
+    checkAccess();
+  }, []);
 
   useEffect(() => {
     fetchItems();
   }, []);
 
-
   const fetchItems = async () => {
     try {
-      const res = await axios.get(
-        `${API_BASE_URL}/api/item-table`,
-        getAuthHeaders()
-      );
+      const res = await axios.get(`${API_BASE_URL}/api/item-table`, getAuthHeaders());
       setData(res.data);
+      
+      // Fetch employee names for all records
+      const uniqueEmployeeIds = [...new Set(res.data.map(item => item.employeeID).filter(Boolean))];
+      const namesMap = {};
+      
+      await Promise.all(
+        uniqueEmployeeIds.map(async (id) => {
+          try {
+            const response = await axios.get(
+              `${API_BASE_URL}/Remittance/employees/${id}`,
+              getAuthHeaders()
+            );
+            namesMap[id] = response.data.name || 'Unknown';
+          } catch (error) {
+            namesMap[id] = 'Unknown';
+          }
+        })
+      );
+      
+      setEmployeeNames(namesMap);
     } catch (err) {
       console.error('Error fetching data:', err);
+      showSnackbar('Failed to fetch item records. Please try again.', 'error');
     }
   };
 
+  const validateForm = () => {
+    const newErrors = {};
+    const requiredFields = ['item_description', 'employeeID', 'name'];
+    
+    requiredFields.forEach(field => {
+      if (!newItem[field] || newItem[field].trim() === '') {
+        newErrors[field] = 'This field is required';
+      }
+    });
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleAdd = async () => {
+    if (!validateForm()) {
+      showSnackbar('Please fill in all required fields', 'error');
+      return;
+    }
+    
     setLoading(true);
     try {
-      await axios.post(
-        `${API_BASE_URL}/api/item-table`,
-        newItem,
-        getAuthHeaders()
-      );
+      await axios.post(`${API_BASE_URL}/api/item-table`, newItem, getAuthHeaders());
       setNewItem({
         item_description: '',
         employeeID: '',
@@ -105,99 +453,172 @@ const ItemTable = () => {
         step: '',
         effectivityDate: '',
       });
-      setTimeout(() => {
-        setLoading(false);
-        setSuccessAction('adding');
+      setSelectedEmployee(null);
+      setErrors({});
+      setTimeout(() => {     
+        setLoading(false);  
+        setSuccessAction("adding");
         setSuccessOpen(true);
         setTimeout(() => setSuccessOpen(false), 2000);
-      }, 300);
+      }, 300);  
       fetchItems();
     } catch (err) {
       console.error('Error adding data:', err);
       setLoading(false);
+      showSnackbar('Failed to add item record. Please try again.', 'error');
     }
   };
 
-
   const handleUpdate = async () => {
     try {
-      await axios.put(
-        `${API_BASE_URL}/api/item-table/${editItem.id}`,
-        editItem,
-        getAuthHeaders()
-      );
+      await axios.put(`${API_BASE_URL}/api/item-table/${editItem.id}`, editItem, getAuthHeaders());
       setEditItem(null);
       setOriginalItem(null);
+      setSelectedEditEmployee(null);
       setIsEditing(false);
       fetchItems();
-      setSuccessAction('edit');
+      setSuccessAction("edit");
       setSuccessOpen(true);
       setTimeout(() => setSuccessOpen(false), 2000);
     } catch (err) {
       console.error('Error updating data:', err);
+      showSnackbar('Failed to update item record. Please try again.', 'error');
     }
   };
 
-
   const handleDelete = async (id) => {
     try {
-      await axios.delete(
-        `${API_BASE_URL}/api/item-table/${id}`,
-        getAuthHeaders()
-      );
+      await axios.delete(`${API_BASE_URL}/api/item-table/${id}`, getAuthHeaders());
       setEditItem(null);
       setOriginalItem(null);
+      setSelectedEditEmployee(null);
       setIsEditing(false);
       fetchItems();
-      setSuccessAction('delete');
+      setSuccessAction("delete");
       setSuccessOpen(true);
       setTimeout(() => setSuccessOpen(false), 2000);
     } catch (err) {
       console.error('Error deleting data:', err);
+      showSnackbar('Failed to delete item record. Please try again.', 'error');
     }
   };
-
 
   const handleChange = (field, value, isEdit = false) => {
     if (isEdit) {
       setEditItem({ ...editItem, [field]: value });
     } else {
       setNewItem({ ...newItem, [field]: value });
+      if (errors[field]) {
+        setErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors[field];
+          return newErrors;
+        });
+      }
     }
   };
 
+  const handleEmployeeChange = (employeeNumber) => {
+    setNewItem({ ...newItem, employeeID: employeeNumber });
+    // Auto-fill name when employee is selected
+    if (selectedEmployee) {
+      setNewItem({ 
+        ...newItem, 
+        employeeID: employeeNumber,
+        name: selectedEmployee.name
+      });
+    }
+    setErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors.employeeID;
+      delete newErrors.name;
+      return newErrors;
+    });
+  };
 
-  // Handle opening the modal (view mode initially)
-  const handleOpenModal = (item) => {
+  const handleEmployeeSelect = (employee) => {
+    setSelectedEmployee(employee);
+    // Auto-fill name when employee is selected
+    setNewItem({ 
+      ...newItem, 
+      employeeID: employee.employeeNumber,
+      name: employee.name
+    });
+  };
+
+  const handleEditEmployeeChange = (employeeNumber) => {
+    setEditItem({ ...editItem, employeeID: employeeNumber });
+    // Auto-fill name when employee is selected
+    if (selectedEditEmployee) {
+      setEditItem({ 
+        ...editItem, 
+        employeeID: employeeNumber,
+        name: selectedEditEmployee.name
+      });
+    }
+  };
+
+  const handleEditEmployeeSelect = (employee) => {
+    setSelectedEditEmployee(employee);
+    // Auto-fill name when employee is selected
+    setEditItem({ 
+      ...editItem, 
+      employeeID: employee.employeeNumber,
+      name: employee.name
+    });
+  };
+
+  const handleOpenModal = async (item) => {
+    const employeeName = employeeNames[item.employeeID] || item.name || 'Unknown';
+    
     setEditItem({ ...item });
     setOriginalItem({ ...item });
+    setSelectedEditEmployee({
+      name: employeeName,
+      employeeNumber: item.employeeID,
+    });
     setIsEditing(false);
   };
 
-
-  // Handle entering edit mode
   const handleStartEdit = () => {
     setIsEditing(true);
   };
 
-
-  // Handle canceling edit mode
   const handleCancelEdit = () => {
     setEditItem({ ...originalItem });
+    setSelectedEditEmployee({
+      name: employeeNames[originalItem.employeeID] || originalItem.name || 'Unknown',
+      employeeNumber: originalItem.employeeID,
+    });
     setIsEditing(false);
   };
 
-
-  // Handle closing modal
   const handleCloseModal = () => {
     setEditItem(null);
     setOriginalItem(null);
+    setSelectedEditEmployee(null);
     setIsEditing(false);
   };
 
+  const handleViewModeChange = (event, newMode) => {
+    if (newMode !== null) {
+      setViewMode(newMode);
+    }
+  };
 
-  const inputStyle = { marginRight: 10, marginBottom: 10, width: 300.25 };
-
+  const hasChanges = () => {
+    if (!editItem || !originalItem) return false;
+    
+    return (
+      editItem.item_description !== originalItem.item_description ||
+      editItem.employeeID !== originalItem.employeeID ||
+      editItem.name !== originalItem.name ||
+      editItem.item_code !== originalItem.item_code ||
+      editItem.salary_grade !== originalItem.salary_grade ||
+      editItem.step !== originalItem.step ||
+      editItem.effectivityDate !== originalItem.effectivityDate
+    );
+  };
 
   const salaryGradeOptions = [
     'JO GRAD',
@@ -205,729 +626,1180 @@ const ItemTable = () => {
     ...Array.from({ length: 33 }, (_, index) => `${index + 1}`),
   ];
 
+  const stepOptions = [...Array(8)].map((_, index) => `step${index + 1}`);
+
+  // Function to get year from salary grade
+  const getYearFromSalaryGrade = (salaryGrade) => {
+    if (!salaryGrade) return new Date().getFullYear().toString();
+    
+    // For JO grades, use current year
+    if (salaryGrade.includes('JO')) {
+      return new Date().getFullYear().toString();
+    }
+    
+    // For regular grades, you might have a mapping logic
+    // For now, we'll use current year as default
+    return new Date().getFullYear().toString();
+  };
+
+  if (hasAccess === null) {
+    return (
+      <Container maxWidth="md" sx={{ py: 8 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <CircularProgress sx={{ color: "#6d2323", mb: 2 }} />
+          <Typography variant="h6" sx={{ color: "#6d2323" }}>
+            Loading access information...
+          </Typography>
+        </Box>
+      </Container>
+    );
+  }
+  
+  if (!hasAccess) {
+    return (
+      <AccessDenied 
+        title="Access Denied"
+        message="You do not have permission to access Item Information. Contact your administrator to request access."
+        returnPath="/admin-home"
+        returnButtonText="Return to Home"
+      />
+    );
+  }
+
+  const filteredData = data.filter((item) => {
+    const employeeID = item.employeeID?.toString() || "";
+    const name = item.name?.toLowerCase() || "";
+    const itemDescription = item.item_description?.toLowerCase() || "";
+    const search = searchTerm.toLowerCase();
+    return employeeID.includes(search) || name.includes(search) || itemDescription.includes(search);
+  });
 
   return (
-    <Container sx={{ mt: 0 }}>
-      {/* Loading Overlay */}
+    <Box sx={{ 
+      minHeight: '100vh', 
+      display: 'flex', 
+      flexDirection: 'column',
+      pt: 2,
+      mt: -5
+    }}>
       <LoadingOverlay open={loading} message="Adding item record..." />
-
-
-      {/* Success Overlay */}
       <SuccessfullOverlay open={successOpen} action={successAction} />
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          mb: 4,
-        }}
-      >
-        {/* Outer wrapper for header + content */}
-        <Box sx={{ width: '75%', maxWidth: '100%' }}>
-          {/* Header */}
-          <Box
-            sx={{
-              backgroundColor: '#6D2323',
-              color: '#ffffff',
-              p: 2,
-              borderRadius: '8px 8px 0 0',
-              display: 'flex',
-              alignItems: 'center',
-              pb: '15px',
-            }}
-          >
-            <LabelIcon sx={{ fontSize: '3rem', mr: 2, mt: '5px', ml: '5px' }} />
-            <Box>
-              <Typography variant="h5" sx={{ mb: 0.5 }}>
-                Item Information
-              </Typography>
-              <Typography variant="body2">
-                Insert Your Item Information
-              </Typography>
-            </Box>
-          </Box>
-
-
-          {/* Content/Form */}
-          <Container
-            sx={{
-              backgroundColor: '#fff',
-              p: 3,
-              borderBottomLeftRadius: 2,
-              borderBottomRightRadius: 2,
-              boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.1)',
-              border: '1px solid #6d2323',
-              width: '100%',
-            }}
-          >
-            <Grid container spacing={3}>
-              {/* Position */}
-              <Grid item xs={12} sm={6}>
-                <Typography
-                  variant="subtitle2"
-                  sx={{ fontWeight: 'bold', mb: 1 }}
-                >
-                  Position
-                </Typography>
-                <TextField
-                  value={newItem.item_description}
-                  onChange={(e) =>
-                    handleChange('item_description', e.target.value)
-                  }
-                  fullWidth
-                  style={inputStyle}
-                />
-              </Grid>
-
-
-              {/* Employee Number */}
-              <Grid item xs={12} sm={6}>
-                <Typography
-                  variant="subtitle2"
-                  sx={{ fontWeight: 'bold', mb: 1 }}
-                >
-                  Employee Number
-                </Typography>
-                <TextField
-                  value={newItem.employeeID}
-                  onChange={(e) => handleChange('employeeID', e.target.value)}
-                  fullWidth
-                  style={inputStyle}
-                />
-              </Grid>
-
-
-              {/* Name */}
-              <Grid item xs={12} sm={6}>
-                <Typography
-                  variant="subtitle2"
-                  sx={{ fontWeight: 'bold', mb: 1 }}
-                >
-                  Name
-                </Typography>
-                <TextField
-                  value={newItem.name}
-                  onChange={(e) => handleChange('name', e.target.value)}
-                  fullWidth
-                  style={inputStyle}
-                />
-              </Grid>
-
-
-              {/* Item Code */}
-              <Grid item xs={12} sm={6}>
-                <Typography
-                  variant="subtitle2"
-                  sx={{ fontWeight: 'bold', mb: 1 }}
-                >
-                  Item Code
-                </Typography>
-                <TextField
-                  value={newItem.item_code}
-                  onChange={(e) => handleChange('item_code', e.target.value)}
-                  fullWidth
-                  style={inputStyle}
-                />
-              </Grid>
-
-
-              {/* Salary Grade */}
-              <Grid item xs={12} sm={6}>
-                <Typography
-                  variant="subtitle2"
-                  sx={{ fontWeight: 'bold', mb: 1 }}
-                >
-                  Salary Grade
-                </Typography>
-                <FormControl fullWidth style={inputStyle}>
-                  <Autocomplete
-                    freeSolo
-                    options={salaryGradeOptions}
-                    value={newItem.salary_grade}
-                    onChange={(event, newValue) =>
-                      handleChange('salary_grade', newValue || '')
-                    }
-                    onInputChange={(event, newInputValue) =>
-                      handleChange('salary_grade', newInputValue)
-                    }
-                    renderInput={(params) => <TextField {...params} />}
-                  />
-                </FormControl>
-              </Grid>
-
-
-              {/* Step */}
-              <Grid item xs={12} sm={6}>
-                <Typography
-                  variant="subtitle2"
-                  sx={{ fontWeight: 'bold', mb: 1 }}
-                >
-                  Step
-                </Typography>
-                <FormControl fullWidth style={inputStyle}>
-                  <Autocomplete
-                    freeSolo
-                    options={[...Array(8)].map(
-                      (_, index) => `step${index + 1}`
-                    )}
-                    value={newItem.step}
-                    onChange={(event, newValue) =>
-                      handleChange('step', newValue || '')
-                    }
-                    onInputChange={(event, newInputValue) =>
-                      handleChange('step', newInputValue)
-                    }
-                    renderInput={(params) => <TextField {...params} />}
-                  />
-                </FormControl>
-              </Grid>
-
-
-              {/* Effectivity Date */}
-              <Grid item xs={12} sm={6}>
-                <Typography
-                  variant="subtitle2"
-                  sx={{ fontWeight: 'bold', mb: 1 }}
-                >
-                  Effectivity Date
-                </Typography>
-                <TextField
-                  value={newItem.effectivityDate}
-                  onChange={(e) =>
-                    handleChange('effectivityDate', e.target.value)
-                  }
-                  fullWidth
-                  style={inputStyle}
-                />
-              </Grid>
-            </Grid>
-
-
-            {/* Add Button */}
-            <Button
-              onClick={handleAdd}
-              variant="contained"
-              startIcon={<AddIcon />}
-              sx={{
-                mt: 3,
-                width: '100%',
-                backgroundColor: '#6D2323',
-                color: '#FEF9E1',
-                '&:hover': { backgroundColor: '#5a1d1d' },
-              }}
-            >
-              Add
-            </Button>
-          </Container>
-        </Box>
+      
+      <Box sx={{ textAlign: 'center', mb: 3, px: 2 }}>
+        <Typography variant="h4" sx={{ color: "#6D2323", fontWeight: 'bold', mb: 0.5 }}>
+          Item Information Management
+        </Typography>
+        <Typography variant="body2" sx={{ color: "#666" }}>
+          Add and manage item records for employees
+        </Typography>
       </Box>
 
-
-      {/* Outer wrapper for header + content */}
-      <Box sx={{ width: '75%', maxWidth: '100%', margin: '20px auto' }}>
-        {/* Header */}
-        <Box
-          sx={{
-            backgroundColor: '#ffffff',
-            color: '#6d2323',
-            p: 2,
-            borderRadius: '8px 8px 0 0',
-            display: 'flex',
-            alignItems: 'center',
-            pb: '15px',
-            border: '1px solid #6d2323',
-            borderBottom: 'none',
-          }}
-        >
-          <ReorderIcon sx={{ fontSize: '3rem', mr: 2, mt: '5px', ml: '5px' }} />
-          <Box>
-            <Typography variant="h5" sx={{ mb: 0.5 }}>
-              Item Records
-            </Typography>
-            <Typography variant="body2">
-              View and manage item information
-            </Typography>
-          </Box>
-        </Box>
-
-
-        {/* Content */}
-        <Container
-          sx={{
-            backgroundColor: '#fff',
-            p: 3,
-            borderBottomLeftRadius: 2,
-            borderBottomRightRadius: 2,
-            boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.1)',
-            border: '1px solid #6d2323',
-            width: '100%',
-          }}
-        >
-          {/* Search Section */}
-          <Box sx={{ mb: 3, width: '100%' }}>
-            {/* Subtitle */}
-            <Typography variant="subtitle2" sx={{ color: '#6D2323', mb: 1 }}>
-              Search Records using Employee Number
-            </Typography>
-
-
-            {/* Search Box */}
-            <Box
-              display="flex"
-              justifyContent="flex-start"
-              alignItems="center"
-              width="100%"
+      <Container maxWidth="xl" sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+        <Grid container spacing={3} sx={{ flexGrow: 1 }}>
+          <Grid item xs={12} lg={6} sx={{ display: 'flex', flexDirection: 'column' }}>
+            <Paper 
+              elevation={4}
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                borderRadius: 2,
+                overflow: 'hidden',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                border: '1px solid rgba(109, 35, 35, 0.1)',
+                height: { xs: 'auto', lg: 'calc(100vh - 200px)' },
+                maxHeight: { xs: 'none', lg: 'calc(100vh - 200px)' }
+              }}
             >
-              <TextField
-                size="small"
-                variant="outlined"
-                placeholder="Search by Employee Number or Name"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+              <Box
                 sx={{
-                  backgroundColor: 'white',
-                  borderRadius: 1,
-                  width: '100%',
-                  maxWidth: '800px',
-                  '& .MuiOutlinedInput-root': {
-                    '& fieldset': {
-                      borderColor: '#6D2323',
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#6D2323',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#6D2323',
-                    },
-                  },
+                  backgroundColor: "#6D2323",
+                  color: "#ffffff",
+                  p: 2,
+                  display: "flex",
+                  alignItems: "center",
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
                 }}
-                InputProps={{
-                  startAdornment: (
-                    <SearchIcon sx={{ color: '#6D2323', marginRight: 1 }} />
-                  ),
-                }}
-              />
-            </Box>
-          </Box>
+              >
+                <FactCheckIcon sx={{ fontSize: "1.8rem", mr: 2 }} />
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                    Add New Item
+                  </Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                    Fill in the item information
+                  </Typography>
+                </Box>
+              </Box>
 
-
-          {/* Records as Boxes */}
-          <Grid container spacing={2}>
-            {data
-              .filter((item) => {
-                const employeeID = item.employeeID?.toString() || '';
-                const name = item.name?.toLowerCase() || '';
-                const search = searchTerm.toLowerCase();
-                return employeeID.includes(search) || name.includes(search);
-              })
-              .map((item) => (
-                <Grid item xs={12} sm={6} md={4} key={item.id}>
-                  <Box
-                    onClick={() => handleOpenModal(item)}
-                    sx={{
-                      border: '1px solid #6d2323',
-                      borderRadius: 2,
-                      p: 2,
-                      cursor: 'pointer',
-                      transition: '0.2s',
-                      '&:hover': { boxShadow: '0px 4px 10px rgba(0,0,0,0.2)' },
-                      height: '80%',
-                    }}
-                  >
-                    {/* Employee Number */}
-                    <Typography
-                      variant="body2"
-                      sx={{ fontWeight: 'bold', color: 'black', mb: 1 }}
-                    >
-                      Employee Number:
+              <Box sx={{ 
+                p: 3, 
+                flexGrow: 1, 
+                display: 'flex', 
+                flexDirection: 'column',
+                overflowY: 'auto'
+              }}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: "bold", mb: 1.5, color: "#6D2323" }}>
+                      Employee Information <span style={{ color: 'red' }}>*</span>
                     </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{ fontWeight: 'bold', color: '#6d2323', mb: 1 }}
-                    >
-                      {item.employeeID}
-                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                          Search Employee
+                        </Typography>
+                        <EmployeeAutocomplete
+                          value={newItem.employeeID}
+                          onChange={handleEmployeeChange}
+                          selectedEmployee={selectedEmployee}
+                          onEmployeeSelect={handleEmployeeSelect}
+                          placeholder="Search and select employee..."
+                          required
+                          error={!!errors.employeeID}
+                          helperText={errors.employeeID || ''}
+                        />
+                      </Grid>
 
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                          Selected Employee
+                        </Typography>
+                        {selectedEmployee ? (
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              backgroundColor: '#f8f9fa',
+                              border: '1px solid #6D2323',
+                              borderRadius: '4px',
+                              padding: '8px 12px',
+                              gap: 1.5,
+                              height: '21px'
+                            }}
+                          >
+                            <PersonIcon sx={{ color: '#6D2323', fontSize: '20px' }} />
+                            <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 'bold',
+                                  color: '#6D2323',
+                                  fontSize: '13px',
+                                  lineHeight: 1.2,
+                                }}
+                              >
+                                {selectedEmployee.name}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  color: '#666',
+                                  fontSize: '11px',
+                                  lineHeight: 1.2,
+                                }}
+                              >
+                                ID: {selectedEmployee.employeeNumber}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        ) : (
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              backgroundColor: '#f5f5f5',
+                              border: '2px dashed #ccc',
+                              borderRadius: '8px',
+                              padding: '8px 12px',
+                              height: '21px',
+                            }}
+                          >
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                color: '#999',
+                                fontStyle: 'italic',
+                                fontSize: '13px',
+                              }}
+                            >
+                              No employee selected
+                            </Typography>
+                          </Box>
+                        )}
+                      </Grid>
+                    </Grid>
+                  </Grid>
 
-                    {/* Position Pill */}
-                    <Chip
-                      label={item.item_description}
-                      sx={{
-                        backgroundColor: '#6d2323',
-                        color: '#fff',
-                        borderRadius: '50px',
-                        px: 2,
+                  <Grid item xs={12}>
+                    <Box sx={{ 
+                      borderBottom: '2px solid #e0e0e0', 
+                      my: 2,
+                      '&::before': {
+                        content: '"Item Details"',
+                        position: 'absolute',
+                        left: 20,
+                        top: -10,
+                        backgroundColor: '#fff',
+                        px: 1,
+                        color: '#6D2323',
                         fontWeight: 'bold',
-                        maxWidth: '100%',
+                        fontSize: '0.875rem'
+                      },
+                      position: 'relative'
+                    }} />
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                      Position <span style={{ color: 'red' }}>*</span>
+                    </Typography>
+                    <TextField
+                      value={newItem.item_description}
+                      onChange={(e) => handleChange("item_description", e.target.value)}
+                      fullWidth
+                      size="small"
+                      error={!!errors.item_description}
+                      helperText={errors.item_description || ''}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                              '& fieldset': {
+                                borderColor: errors.item_description ? 'red' : '#6D2323',
+                                borderWidth: '1.5px'
+                              },
+                              '&:hover fieldset': {
+                                borderColor: errors.item_description ? 'red' : '#6D2323',
+                              },
+                              '&.Mui-focused fieldset': {
+                                borderColor: errors.item_description ? 'red' : '#6D2323',
+                              },
+                            },
                       }}
                     />
-                  </Box>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                      Item Code
+                    </Typography>
+                    <TextField
+                      value={newItem.item_code}
+                      onChange={(e) => handleChange("item_code", e.target.value)}
+                      fullWidth
+                      size="small"
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                              '& fieldset': {
+                                borderColor: '#6D2323',
+                                borderWidth: '1.5px'
+                              },
+                              '&:hover fieldset': {
+                                borderColor: '#6D2323',
+                              },
+                              '&.Mui-focused fieldset': {
+                                borderColor: '#6D2323',
+                              },
+                            },
+                      }}
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                      Salary Grade
+                    </Typography>
+                    <FormControl fullWidth>
+                      <Autocomplete
+                        freeSolo
+                        options={salaryGradeOptions}
+                        value={newItem.salary_grade}
+                        onChange={(event, newValue) => {
+                          handleChange("salary_grade", newValue || '');
+                          // Auto-update effectivity date when salary grade changes
+                          if (newValue) {
+                            handleChange("effectivityDate", getYearFromSalaryGrade(newValue));
+                          }
+                        }}
+                        onInputChange={(event, newInputValue) => {
+                          handleChange("salary_grade", newInputValue);
+                          // Auto-update effectivity date when salary grade changes
+                          if (newInputValue) {
+                            handleChange("effectivityDate", getYearFromSalaryGrade(newInputValue));
+                          }
+                        }}
+                        renderInput={(params) => (
+                          <TextField 
+                            {...params} 
+                            size="small"
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                '& fieldset': {
+                                  borderColor: '#6D2323',
+                                  borderWidth: '1.5px'
+                                },
+                                '&:hover fieldset': {
+                                  borderColor: '#6D2323',
+                                },
+                                '&.Mui-focused fieldset': {
+                                  borderColor: '#6D2323',
+                                },
+                              },
+                            }}
+                          />
+                        )}
+                      />
+                    </FormControl>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                      Step
+                    </Typography>
+                    <FormControl fullWidth>
+                      <Autocomplete
+                        freeSolo
+                        options={stepOptions}
+                        value={newItem.step}
+                        onChange={(event, newValue) =>
+                          handleChange("step", newValue || '')
+                        }
+                        onInputChange={(event, newInputValue) =>
+                          handleChange("step", newInputValue)
+                        }
+                        renderInput={(params) => (
+                          <TextField 
+                            {...params} 
+                            size="small"
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                '& fieldset': {
+                                  borderColor: '#6D2323',
+                                  borderWidth: '1.5px'
+                                },
+                                '&:hover fieldset': {
+                                  borderColor: '#6D2323',
+                                },
+                                '&.Mui-focused fieldset': {
+                                  borderColor: '#6D2323',
+                                },
+                              },
+                            }}
+                          />
+                        )}
+                      />
+                    </FormControl>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                      Effectivity Date (Year)
+                    </Typography>
+                    <TextField
+                      value={newItem.effectivityDate}
+                      onChange={(e) => handleChange("effectivityDate", e.target.value)}
+                      fullWidth
+                      size="small"
+                      placeholder="YYYY"
+                      inputProps={{ maxLength: 4 }}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                              '& fieldset': {
+                                borderColor: '#6D2323',
+                                borderWidth: '1.5px'
+                              },
+                              '&:hover fieldset': {
+                                borderColor: '#6D2323',
+                              },
+                              '&.Mui-focused fieldset': {
+                                borderColor: '#6D2323',
+                              },
+                            },
+                      }}
+                    />
+                  </Grid>
                 </Grid>
-              ))}
-            {data.filter((item) => {
-              const employeeID = item.employeeID?.toString() || '';
-              const name = item.name?.toLowerCase() || '';
-              const search = searchTerm.toLowerCase();
-              return employeeID.includes(search) || name.includes(search);
-            }).length === 0 && (
-              <Grid item xs={12}>
-                <Typography
-                  variant="body1"
-                  sx={{
-                    textAlign: 'center',
-                    color: '#6D2323',
-                    fontWeight: 'bold',
-                    mt: 2,
-                  }}
-                >
-                  No Records Found
-                </Typography>
-              </Grid>
-            )}
+
+                <Box sx={{ mt: 'auto', pt: 2 }}>
+                  <Button
+                    onClick={handleAdd}
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    fullWidth
+                    sx={{
+                      backgroundColor: "#6D2323",
+                      color: "#FEF9E1",
+                      py: 1.2,
+                      fontWeight: 'bold',
+                      "&:hover": { 
+                        backgroundColor: "#5a1d1d",
+                      },
+                    }}
+                  >
+                    Add Item Record
+                  </Button>
+                </Box>
+              </Box>
+            </Paper>
           </Grid>
-        </Container>
 
-
-        <Modal
-          open={!!editItem}
-          onClose={handleCloseModal}
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Box
-            sx={{
-              backgroundColor: '#fff',
-              border: '1px solid #6d2323',
-              borderRadius: 2,
-              width: '75%',
-              maxWidth: '900px',
-              maxHeight: '85vh',
-              overflowY: 'auto',
-              position: 'relative',
-            }}
-          >
-            {editItem && (
-              <>
-                {/* Modal Header */}
-                <Box
+          <Grid item xs={12} lg={6} sx={{ display: 'flex', flexDirection: 'column' }}>
+            <Paper 
+              elevation={4}
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                borderRadius: 2,
+                overflow: 'hidden',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                border: '1px solid rgba(109, 35, 35, 0.1)',
+                height: { xs: 'auto', lg: 'calc(100vh - 200px)' },
+                maxHeight: { xs: 'none', lg: 'calc(100vh - 200px)' }
+              }}
+            >
+              <Box
+                sx={{
+                  backgroundColor: "#6D2323",
+                  color: "#ffffff",
+                  p: 2,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center" }}>
+                  <ReorderIcon sx={{ fontSize: "1.8rem", mr: 2 }} />
+                  <Box>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                      Item Records
+                    </Typography>
+                    <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                      View and manage existing records
+                    </Typography>
+                  </Box>
+                </Box>
+                
+                <ToggleButtonGroup
+                  value={viewMode}
+                  exclusive
+                  onChange={handleViewModeChange}
+                  aria-label="view mode"
+                  size="small"
                   sx={{
-                    backgroundColor: '#6D2323',
-                    color: '#ffffff',
-                    p: 2,
-                    borderRadius: '8px 8px 0 0',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    '& .MuiToggleButton-root': {
+                      color: 'white',
+                      borderColor: 'rgba(255, 255, 255, 0.5)',
+                      padding: '4px 8px',
+                      '&.Mui-selected': {
+                        backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                        color: 'white'
+                      },
+                    }
                   }}
                 >
-                  <Typography variant="h6">
-                    {isEditing ? 'Edit Item Information' : 'Item Information'}
-                  </Typography>
-                  <IconButton onClick={handleCloseModal} sx={{ color: '#fff' }}>
-                    <Close />
-                  </IconButton>
+                  <ToggleButton value="grid" aria-label="grid view">
+                    <ViewModuleIcon fontSize="small" />
+                  </ToggleButton>
+                  <ToggleButton value="list" aria-label="list view">
+                    <ViewListIcon fontSize="small" />
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
+
+              <Box sx={{ 
+                p: 3, 
+                flexGrow: 1, 
+                display: 'flex', 
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}>
+                <Box sx={{ mb: 2 }}>
+                  <TextField
+                    size="small"
+                    variant="outlined"
+                    placeholder="Search by Employee ID, Name, or Position"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    fullWidth
+                    sx={{
+                      "& .MuiOutlinedInput-root": {
+                        "& fieldset": {
+                          borderColor: "#6D2323",
+                          borderWidth: '1.5px'
+                        },
+                        "&:hover fieldset": {
+                          borderColor: "#6D2323",
+                        },
+                        "&.Mui-focused fieldset": {
+                          borderColor: "#6D2323",
+                        },
+                      },
+                    }}
+                    InputProps={{
+                      startAdornment: (
+                        <SearchIcon sx={{ color: "#6D2323", mr: 1 }} />
+                      ),
+                    }}
+                  />
                 </Box>
 
-
-                {/* Modal Content (Form Style) */}
-                <Box sx={{ p: 3 }}>
-                  <Grid container spacing={3}>
-                    {/* Position */}
-                    <Grid item xs={12} sm={6}>
-                      <Typography
-                        variant="subtitle2"
-                        sx={{ fontWeight: 'bold', mb: 1 }}
+                <Box 
+                  sx={{ 
+                    flexGrow: 1, 
+                    overflowY: 'auto',
+                    pr: 1,
+                    '&::-webkit-scrollbar': {
+                      width: '6px',
+                    },
+                    '&::-webkit-scrollbar-track': {
+                      background: '#f1f1f1',
+                      borderRadius: '3px',
+                    },
+                    '&::-webkit-scrollbar-thumb': {
+                      background: '#6D2323',
+                      borderRadius: '3px',
+                    },
+                  }}
+                >
+                  {viewMode === 'grid' ? (
+                    <Grid container spacing={1.5}>
+                      {filteredData.map((item) => (
+                        <Grid item xs={12} sm={6} md={4} key={item.id}>
+                          <Card
+                            onClick={() => handleOpenModal(item)}
+                            sx={{
+                              cursor: "pointer",
+                              border: "1px solid #e0e0e0",
+                              height: "100%",
+                              display: 'flex',
+                              flexDirection: 'column',
+                              "&:hover": { 
+                                borderColor: "#6d2323",
+                                transform: 'translateY(-2px)',
+                                transition: 'all 0.2s ease',
+                                boxShadow: '0 4px 8px rgba(0,0,0,0.15)'
+                              },
+                            }}
+                          >
+                            <CardContent sx={{ p: 1.5, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                                <FactCheckIcon sx={{ fontSize: 18, color: '#6d2323', mr: 0.5 }} />
+                                <Typography variant="caption" sx={{ 
+                                  color: '#666', 
+                                  px: 0.5, 
+                                  py: 0.2, 
+                                  borderRadius: 0.5,
+                                  fontSize: '0.7rem',
+                                  fontWeight: 'bold'
+                                }}>
+                                  ID: {item.employeeID}
+                                </Typography>
+                              </Box>
+                              
+                              <Typography variant="body2" fontWeight="bold" color="#333" mb={0.5} noWrap>
+                                {employeeNames[item.employeeID] || item.name || 'Loading...'}
+                              </Typography>
+                              
+                              <Typography variant="body2" fontWeight="bold" color="#333" mb={1} noWrap sx={{ flexGrow: 1 }}>
+                                {item.item_description || 'No Position'}
+                              </Typography>
+                              
+                              {item.salary_grade && (
+                                <Box
+                                  sx={{
+                                    display: 'inline-block',
+                                    px: 1,
+                                    py: 0.3,
+                                    borderRadius: 0.5,
+                                    backgroundColor: '#f5f5f5',
+                                    border: '1px solid #ddd',
+                                    alignSelf: 'flex-start'
+                                  }}
+                                >
+                                  <Typography variant="caption" sx={{ 
+                                    color: '#666',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 'bold'
+                                  }}>
+                                    Grade: {item.salary_grade}
+                                  </Typography>
+                                </Box>
+                              )}
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  ) : (
+                    filteredData.map((item) => (
+                      <Card
+                        key={item.id}
+                        onClick={() => handleOpenModal(item)}
+                        sx={{
+                          cursor: "pointer",
+                          border: "1px solid #e0e0e0",
+                          mb: 1,
+                          "&:hover": { 
+                            borderColor: "#6d2323",
+                            backgroundColor: '#fafafa'
+                          },
+                        }}
                       >
-                        Position
+                        <Box sx={{ p: 1.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                            <Box sx={{ mr: 1.5, mt: 0.2 }}>
+                              <FactCheckIcon sx={{ fontSize: 20, color: '#6d2323' }} />
+                            </Box>
+                            
+                            <Box sx={{ flexGrow: 1 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                                <Typography variant="caption" sx={{ 
+                                  color: '#666',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 'bold',
+                                  mr: 1
+                                }}>
+                                  ID: {item.employeeID}
+                                </Typography>
+                                <Typography variant="body2" fontWeight="bold" color="#333">
+                                  {employeeNames[item.employeeID] || item.name || 'Loading...'}
+                                </Typography>
+                              </Box>
+                              
+                              <Typography variant="body2" color="#666" sx={{ mb: 0.5 }}>
+                                {item.item_description || 'No Position'}
+                              </Typography>
+                              
+                              {item.salary_grade && (
+                                <Box
+                                  sx={{
+                                    display: 'inline-block',
+                                    px: 1,
+                                    py: 0.3,
+                                    borderRadius: 0.5,
+                                    backgroundColor: '#f5f5f5',
+                                    border: '1px solid #ddd'
+                                  }}
+                                >
+                                  <Typography variant="caption" sx={{ 
+                                    color: '#666',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 'bold'
+                                  }}>
+                                    Grade: {item.salary_grade}
+                                  </Typography>
+                                </Box>
+                              )}
+                            </Box>
+                          </Box>
+                        </Box>
+                      </Card>
+                    ))
+                  )}
+                  
+                  {filteredData.length === 0 && (
+                    <Box textAlign="center" py={4}>
+                      <Typography variant="body1" color="#555" fontWeight="bold">
+                        No Records Found
                       </Typography>
+                      <Typography variant="body2" color="#666" sx={{ mt: 0.5 }}>
+                        Try adjusting your search criteria
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              </Box>
+            </Paper>
+          </Grid>
+        </Grid>
+      </Container>
+
+      <Modal
+        open={!!editItem}
+        onClose={handleCloseModal}
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Paper
+          sx={{
+            width: "90%",
+            maxWidth: "600px",
+            maxHeight: "90vh",
+            display: "flex",
+            flexDirection: "column",
+            borderRadius: 2,
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)',
+            overflow: 'hidden',
+          }}
+        >
+          {editItem && (
+            <>
+              {/* Modal Header */}
+              <Box
+                sx={{
+                  backgroundColor: "#6D2323",
+                  color: "#ffffff",
+                  p: 2,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
+                }}
+              >
+                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                  {isEditing ? "Edit Item Information" : "Item Details"}
+                </Typography>
+                <IconButton onClick={handleCloseModal} sx={{ color: "#fff" }}>
+                  <Close />
+                </IconButton>
+              </Box>
+
+              {/* Modal Content with Scroll */}
+              <Box sx={{ 
+                p: 3, 
+                flexGrow: 1, 
+                overflowY: 'auto',
+                maxHeight: 'calc(90vh - 140px)', // Account for header and sticky footer
+                '&::-webkit-scrollbar': {
+                  width: '6px',
+                },
+                '&::-webkit-scrollbar-track': {
+                  background: '#f1f1f1',
+                  borderRadius: '3px',
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  background: '#6D2323',
+                  borderRadius: '3px',
+                },
+              }}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: "bold", mb: 1.5, color: "#6D2323" }}>
+                      Employee Information
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                          Search Employee
+                        </Typography>
+                        <EmployeeAutocomplete
+                          value={editItem?.employeeID || ''}
+                          onChange={isEditing ? handleEditEmployeeChange : () => {}}
+                          selectedEmployee={selectedEditEmployee}
+                          onEmployeeSelect={isEditing ? handleEditEmployeeSelect : () => {}}
+                          placeholder="Search and select employee..."
+                          required
+                          disabled={!isEditing}
+                          dropdownDisabled={!isEditing}
+                        />
+                        {!isEditing && (
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: '#666',
+                              fontStyle: 'italic',
+                              display: 'block',
+                              mt: 0.5,
+                            }}
+                          >
+                            Contact administrator for assistance.
+                          </Typography>
+                        )}
+                      </Grid>
+
+                      <Grid item xs={12} sm={6}>
+                        <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                          Selected Employee
+                        </Typography>
+                        {selectedEditEmployee ? (
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              backgroundColor: '#f8f9fa',
+                              border: '2px solid #6D2323',
+                              borderRadius: '8px',
+                              padding: '8px 12px',
+                              gap: 1.5,
+                              height: '21px',
+                            }}
+                          >
+                            <PersonIcon sx={{ color: '#6D2323', fontSize: '20px' }} />
+                            <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 'bold',
+                                  color: '#6D2323',
+                                  fontSize: '13px',
+                                  lineHeight: 1.2,
+                                }}
+                              >
+                                {selectedEditEmployee.name}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  color: '#666',
+                                  fontSize: '11px',
+                                  lineHeight: 1.2,
+                                }}
+                              >
+                                ID: {selectedEditEmployee.employeeNumber}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        ) : (
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              backgroundColor: '#f5f5f5',
+                              border: '2px dashed #ccc',
+                              borderRadius: '8px',
+                              padding: '8px 12px',
+                              height: '21px',
+                            }}
+                          >
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                color: '#999',
+                                fontStyle: 'italic',
+                                fontSize: '13px',
+                              }}
+                            >
+                              No employee selected
+                            </Typography>
+                          </Box>
+                        )}
+                      </Grid>
+                    </Grid>
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Box sx={{ 
+                      borderBottom: '2px solid #e0e0e0', 
+                      my: 2,
+                      '&::before': {
+                        content: '"Item Details"',
+                        position: 'absolute',
+                        left: 20,
+                        top: -10,
+                        backgroundColor: '#fff',
+                        px: 1,
+                        color: '#6D2323',
+                        fontWeight: 'bold',
+                        fontSize: '0.875rem'
+                      },
+                      position: 'relative'
+                    }} />
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                      Position
+                    </Typography>
+                    {isEditing ? (
                       <TextField
                         value={editItem.item_description}
-                        onChange={(e) =>
-                          setEditItem({
-                            ...editItem,
-                            item_description: e.target.value,
-                          })
-                        }
+                        onChange={(e) => handleChange("item_description", e.target.value, true)}
                         fullWidth
-                        disabled={!isEditing}
+                        size="small"
                         sx={{
-                          '& .MuiInputBase-input.Mui-disabled': {
-                            WebkitTextFillColor: '#000000',
-                            color: '#000000',
+                          '& .MuiOutlinedInput-root': {
+                            '& fieldset': {
+                              borderColor: "#6D2323",
+                            },
+                            '&:hover fieldset': {
+                              borderColor: "#6D2323",
+                            },
+                            '&.Mui-focused fieldset': {
+                              borderColor: "#6D2323",
+                            },
                           },
                         }}
                       />
-                    </Grid>
-
-
-                    {/* Employee Number */}
-                    <Grid item xs={12} sm={6}>
-                      <Typography
-                        variant="subtitle2"
-                        sx={{ fontWeight: 'bold', mb: 1 }}
-                      >
-                        Employee Number
+                    ) : (
+                      <Typography variant="body2" sx={{ p: 1, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                        {editItem.item_description || 'N/A'}
                       </Typography>
-                      <TextField
-                        value={editItem.employeeID}
-                        onChange={(e) =>
-                          setEditItem({
-                            ...editItem,
-                            employeeID: e.target.value,
-                          })
-                        }
-                        fullWidth
-                        disabled={!isEditing}
-                        sx={{
-                          '& .MuiInputBase-input.Mui-disabled': {
-                            WebkitTextFillColor: '#000000',
-                            color: '#000000',
-                          },
-                        }}
-                      />
-                    </Grid>
+                    )}
+                  </Grid>
 
-
-                    {/* Name */}
-                    <Grid item xs={12} sm={6}>
-                      <Typography
-                        variant="subtitle2"
-                        sx={{ fontWeight: 'bold', mb: 1 }}
-                      >
-                        Name
-                      </Typography>
-                      <TextField
-                        value={editItem.name}
-                        onChange={(e) =>
-                          setEditItem({ ...editItem, name: e.target.value })
-                        }
-                        fullWidth
-                        disabled={!isEditing}
-                        sx={{
-                          '& .MuiInputBase-input.Mui-disabled': {
-                            WebkitTextFillColor: '#000000',
-                            color: '#000000',
-                          },
-                        }}
-                      />
-                    </Grid>
-
-
-                    {/* Item Code */}
-                    <Grid item xs={12} sm={6}>
-                      <Typography
-                        variant="subtitle2"
-                        sx={{ fontWeight: 'bold', mb: 1 }}
-                      >
-                        Item Code
-                      </Typography>
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                      Item Code
+                    </Typography>
+                    {isEditing ? (
                       <TextField
                         value={editItem.item_code}
-                        onChange={(e) =>
-                          setEditItem({
-                            ...editItem,
-                            item_code: e.target.value,
-                          })
-                        }
+                        onChange={(e) => handleChange("item_code", e.target.value, true)}
                         fullWidth
-                        disabled={!isEditing}
+                        size="small"
                         sx={{
-                          '& .MuiInputBase-input.Mui-disabled': {
-                            WebkitTextFillColor: '#000000',
-                            color: '#000000',
+                          '& .MuiOutlinedInput-root': {
+                            '& fieldset': {
+                              borderColor: "#6D2323",
+                            },
+                            '&:hover fieldset': {
+                              borderColor: "#6D2323",
+                            },
+                            '&.Mui-focused fieldset': {
+                              borderColor: "#6D2323",
+                            },
                           },
                         }}
                       />
-                    </Grid>
-
-
-                    {/* Salary Grade */}
-                    <Grid item xs={12} sm={6}>
-                      <Typography
-                        variant="subtitle2"
-                        sx={{ fontWeight: 'bold', mb: 1 }}
-                      >
-                        Salary Grade
+                    ) : (
+                      <Typography variant="body2" sx={{ p: 1, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                        {editItem.item_code || 'N/A'}
                       </Typography>
-                      {isEditing ? (
+                    )}
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                      Salary Grade
+                    </Typography>
+                    {isEditing ? (
+                      <FormControl fullWidth>
                         <Autocomplete
                           freeSolo
                           options={salaryGradeOptions}
                           value={editItem.salary_grade}
-                          onChange={(event, newValue) =>
-                            setEditItem({
-                              ...editItem,
-                              salary_grade: newValue || '',
-                            })
-                          }
-                          onInputChange={(event, newInputValue) =>
-                            setEditItem({
-                              ...editItem,
-                              salary_grade: newInputValue,
-                            })
-                          }
+                          onChange={(event, newValue) => {
+                            handleChange("salary_grade", newValue || '', true);
+                            // Auto-update effectivity date when salary grade changes
+                            if (newValue) {
+                              handleChange("effectivityDate", getYearFromSalaryGrade(newValue), true);
+                            }
+                          }}
+                          onInputChange={(event, newInputValue) => {
+                            handleChange("salary_grade", newInputValue, true);
+                            // Auto-update effectivity date when salary grade changes
+                            if (newInputValue) {
+                              handleChange("effectivityDate", getYearFromSalaryGrade(newInputValue), true);
+                            }
+                          }}
                           renderInput={(params) => (
-                            <TextField {...params} fullWidth />
+                            <TextField 
+                              {...params} 
+                              size="small"
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  '& fieldset': {
+                                    borderColor: "#6D2323",
+                                  },
+                                  '&:hover fieldset': {
+                                    borderColor: "#6D2323",
+                                  },
+                                  '&.Mui-focused fieldset': {
+                                    borderColor: "#6D2323",
+                                  },
+                                },
+                              }}
+                            />
                           )}
                         />
-                      ) : (
-                        <TextField
-                          value={editItem.salary_grade}
-                          fullWidth
-                          disabled
-                          sx={{
-                            '& .MuiInputBase-input.Mui-disabled': {
-                              WebkitTextFillColor: '#000000',
-                              color: '#000000',
-                            },
-                          }}
-                        />
-                      )}
-                    </Grid>
-
-
-                    {/* Step */}
-                    <Grid item xs={12} sm={6}>
-                      <Typography
-                        variant="subtitle2"
-                        sx={{ fontWeight: 'bold', mb: 1 }}
-                      >
-                        Step
+                      </FormControl>
+                    ) : (
+                      <Typography variant="body2" sx={{ p: 1, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                        {editItem.salary_grade || 'N/A'}
                       </Typography>
-                      {isEditing ? (
+                    )}
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                      Step
+                    </Typography>
+                    {isEditing ? (
+                      <FormControl fullWidth>
                         <Autocomplete
                           freeSolo
-                          options={[...Array(8)].map(
-                            (_, index) => `step${index + 1}`
-                          )}
+                          options={stepOptions}
                           value={editItem.step}
                           onChange={(event, newValue) =>
-                            setEditItem({ ...editItem, step: newValue || '' })
+                            handleChange("step", newValue || '', true)
                           }
                           onInputChange={(event, newInputValue) =>
-                            setEditItem({ ...editItem, step: newInputValue })
+                            handleChange("step", newInputValue, true)
                           }
                           renderInput={(params) => (
-                            <TextField {...params} fullWidth />
+                            <TextField 
+                              {...params} 
+                              size="small"
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  '& fieldset': {
+                                    borderColor: "#6D2323",
+                                  },
+                                  '&:hover fieldset': {
+                                    borderColor: "#6D2323",
+                                  },
+                                  '&.Mui-focused fieldset': {
+                                    borderColor: "#6D2323",
+                                  },
+                                },
+                              }}
+                            />
                           )}
                         />
-                      ) : (
-                        <TextField
-                          value={editItem.step}
-                          fullWidth
-                          disabled
-                          sx={{
-                            '& .MuiInputBase-input.Mui-disabled': {
-                              WebkitTextFillColor: '#000000',
-                              color: '#000000',
-                            },
-                          }}
-                        />
-                      )}
-                    </Grid>
-
-
-                    {/* Effectivity Date */}
-                    <Grid item xs={12} sm={6}>
-                      <Typography
-                        variant="subtitle2"
-                        sx={{ fontWeight: 'bold', mb: 1 }}
-                      >
-                        Effectivity Date
+                      </FormControl>
+                    ) : (
+                      <Typography variant="body2" sx={{ p: 1, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                        {editItem.step || 'N/A'}
                       </Typography>
+                    )}
+                  </Grid>
+
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                      Effectivity Date (Year)
+                    </Typography>
+                    {isEditing ? (
                       <TextField
                         value={editItem.effectivityDate}
-                        onChange={(e) =>
-                          setEditItem({
-                            ...editItem,
-                            effectivityDate: e.target.value,
-                          })
-                        }
+                        onChange={(e) => handleChange("effectivityDate", e.target.value, true)}
                         fullWidth
-                        disabled={!isEditing}
+                        size="small"
+                        placeholder="YYYY"
+                        inputProps={{ maxLength: 4 }}
                         sx={{
-                          '& .MuiInputBase-input.Mui-disabled': {
-                            WebkitTextFillColor: '#000000',
-                            color: '#000000',
+                          '& .MuiOutlinedInput-root': {
+                            '& fieldset': {
+                              borderColor: "#6D2323",
+                            },
+                            '&:hover fieldset': {
+                              borderColor: "#6D2323",
+                            },
+                            '&.Mui-focused fieldset': {
+                              borderColor: "#6D2323",
+                            },
                           },
                         }}
                       />
-                    </Grid>
-                  </Grid>
-
-
-                  {/* Action Buttons */}
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'flex-end',
-                      mt: 3,
-                      gap: 2,
-                    }}
-                  >
-                    {!isEditing ? (
-                      // View mode buttons
-                      <>
-                        <Button
-                          onClick={() => handleDelete(editItem.id)}
-                          variant="outlined"
-                          startIcon={<DeleteIcon />}
-                          sx={{
-                            color: '#ffffff',
-                            backgroundColor: 'black',
-                          }}
-                        >
-                          Delete
-                        </Button>
-                        <Button
-                          onClick={handleStartEdit}
-                          variant="contained"
-                          startIcon={<EditIcon />}
-                          sx={{ backgroundColor: '#6D2323', color: '#FEF9E1' }}
-                        >
-                          Edit
-                        </Button>
-                      </>
                     ) : (
-                      // Edit mode buttons
-                      <>
-                        <Button
-                          onClick={handleCancelEdit}
-                          variant="outlined"
-                          startIcon={<CancelIcon />}
-                          sx={{
-                            color: '#ffffff',
-                            backgroundColor: 'black',
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          onClick={handleUpdate}
-                          variant="contained"
-                          startIcon={<SaveIcon />}
-                          sx={{ backgroundColor: '#6D2323', color: '#FEF9E1' }}
-                        >
-                          Save
-                        </Button>
-                      </>
+                      <Typography variant="body2" sx={{ p: 1, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                        {editItem.effectivityDate || 'N/A'}
+                      </Typography>
                     )}
-                  </Box>
-                </Box>
-              </>
-            )}
-          </Box>
-        </Modal>
-      </Box>
-    </Container>
+                  </Grid>
+                </Grid>
+              </Box>
+
+              {/* Sticky Action Buttons */}
+              <Box
+                sx={{
+                  backgroundColor: "#ffffff",
+                  borderTop: "1px solid #e0e0e0",
+                  p: 2,
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: 2,
+                  position: 'sticky',
+                  bottom: 0,
+                  zIndex: 10,
+                  boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
+                }}
+              >
+                {!isEditing ? (
+                  <>
+                    <Button
+                      onClick={() => handleDelete(editItem.id)}
+                      variant="outlined"
+                      startIcon={<DeleteIcon />}
+                      sx={{
+                        color: "#d32f2f",
+                        borderColor: "#d32f2f",
+                        "&:hover": {
+                          backgroundColor: "#d32f2f",
+                          color: "#fff"
+                        }
+                      }}
+                    >
+                      Delete
+                    </Button>
+                    <Button
+                      onClick={handleStartEdit}
+                      variant="contained"
+                      startIcon={<EditIcon />}
+                      sx={{ 
+                        backgroundColor: "#6D2323", 
+                        color: "#FEF9E1",
+                        "&:hover": { backgroundColor: "#5a1d1d" }
+                      }}
+                    >
+                      Edit
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      onClick={handleCancelEdit}
+                      variant="outlined"
+                      startIcon={<CancelIcon />}
+                      sx={{
+                        color: "#666",
+                        borderColor: "#666",
+                        "&:hover": {
+                          backgroundColor: "#f5f5f5"
+                        }
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleUpdate}
+                      variant="contained"
+                      startIcon={<SaveIcon />}
+                      disabled={!hasChanges()}
+                      sx={{ 
+                        backgroundColor: hasChanges() ? "#6D2323" : "#ccc", 
+                        color: "#FEF9E1",
+                        "&:hover": { 
+                          backgroundColor: hasChanges() ? "#5a1d1d" : "#ccc"
+                        },
+                        "&:disabled": {
+                          backgroundColor: "#ccc",
+                          color: "#999"
+                        }
+                      }}
+                    >
+                      Save
+                    </Button>
+                  </>
+                )}
+              </Box>
+            </>
+          )}
+        </Paper>
+      </Modal>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Box>
   );
 };
 
-
 export default ItemTable;
-
-
-

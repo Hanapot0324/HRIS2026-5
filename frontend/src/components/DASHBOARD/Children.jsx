@@ -1097,7 +1097,7 @@ const Children = () => {
                             onClick={() => handleOpenModal(child)}
                             sx={{
                               cursor: "pointer",
-                              border: "1px solid #ddd",
+                              border: "1px solid #e0e0e0",
                               height: "100%",
                               display: 'flex',
                               flexDirection: 'column',
@@ -1113,14 +1113,14 @@ const Children = () => {
                               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                                 <ChildCareIcon sx={{ fontSize: 18, color: '#6d2323', mr: 0.5 }} />
                                 <Typography variant="caption" sx={{ 
-                                  color: '#6d2323', 
+                                  color: '#666', 
                                   px: 0.5, 
                                   py: 0.2, 
                                   borderRadius: 0.5,
                                   fontSize: '0.7rem',
                                   fontWeight: 'bold'
                                 }}>
-                                  {child.person_id}
+                                  ID: {child.person_id}
                                 </Typography>
                               </Box>
                               
@@ -1133,17 +1133,25 @@ const Children = () => {
                               </Typography>
                               
                               {child.dateOfBirth && (
-                                <Chip
-                                  label={`Age: ${getAge(child.dateOfBirth)}`}
-                                  size="small"
+                                <Box
                                   sx={{
-                                    backgroundColor: "#6d2323",
-                                    color: "#fff",
-                                    fontWeight: "bold",
-                                    fontSize: '0.7rem',
+                                    display: 'inline-block',
+                                    px: 1,
+                                    py: 0.3,
+                                    borderRadius: 0.5,
+                                    backgroundColor: '#f5f5f5',
+                                    border: '1px solid #ddd',
                                     alignSelf: 'flex-start'
                                   }}
-                                />
+                                >
+                                  <Typography variant="caption" sx={{ 
+                                    color: '#666',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 'bold'
+                                  }}>
+                                    Age: {getAge(child.dateOfBirth)}
+                                  </Typography>
+                                </Box>
                               )}
                             </CardContent>
                           </Card>
@@ -1157,7 +1165,7 @@ const Children = () => {
                         onClick={() => handleOpenModal(child)}
                         sx={{
                           cursor: "pointer",
-                          border: "1px solid #ddd",
+                          border: "1px solid #e0e0e0",
                           mb: 1,
                           "&:hover": { 
                             borderColor: "#6d2323",
@@ -1174,16 +1182,12 @@ const Children = () => {
                             <Box sx={{ flexGrow: 1 }}>
                               <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
                                 <Typography variant="caption" sx={{ 
-                                  backgroundColor: '#6d2323', 
-                                  color: 'white', 
-                                  px: 0.5, 
-                                  py: 0.2, 
-                                  borderRadius: 0.5,
+                                  color: '#666',
                                   fontSize: '0.7rem',
                                   fontWeight: 'bold',
                                   mr: 1
                                 }}>
-                                  {child.person_id}
+                                  ID: {child.person_id}
                                 </Typography>
                                 <Typography variant="body2" fontWeight="bold" color="#333">
                                   {employeeNames[child.person_id] || 'Loading...'}
@@ -1195,9 +1199,24 @@ const Children = () => {
                               </Typography>
                               
                               {child.dateOfBirth && (
-                                <Typography variant="caption" color="#666">
-                                  Age: {getAge(child.dateOfBirth)} years
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'inline-block',
+                                    px: 1,
+                                    py: 0.3,
+                                    borderRadius: 0.5,
+                                    backgroundColor: '#f5f5f5',
+                                    border: '1px solid #ddd'
+                                  }}
+                                >
+                                  <Typography variant="caption" sx={{ 
+                                    color: '#666',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 'bold'
+                                  }}>
+                                    Age: {getAge(child.dateOfBirth)} years
+                                  </Typography>
+                                </Box>
                               )}
                             </Box>
                           </Box>
@@ -1237,22 +1256,27 @@ const Children = () => {
             width: "90%",
             maxWidth: "600px",
             maxHeight: "90vh",
-            overflowY: 'auto',
+            display: "flex",
+            flexDirection: "column",
             borderRadius: 2,
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)',
+            overflow: 'hidden',
           }}
         >
           {editChild && (
             <>
+              {/* Modal Header */}
               <Box
                 sx={{
                   backgroundColor: "#6D2323",
                   color: "#ffffff",
                   p: 2,
-                  borderRadius: "8px 8px 0 0",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
                 }}
               >
                 <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
@@ -1263,7 +1287,24 @@ const Children = () => {
                 </IconButton>
               </Box>
 
-              <Box sx={{ p: 3 }}>
+              {/* Modal Content with Scroll */}
+              <Box sx={{ 
+                p: 3, 
+                flexGrow: 1, 
+                overflowY: 'auto',
+                maxHeight: 'calc(90vh - 140px)', // Account for header and sticky footer
+                '&::-webkit-scrollbar': {
+                  width: '6px',
+                },
+                '&::-webkit-scrollbar-track': {
+                  background: '#f1f1f1',
+                  borderRadius: '3px',
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  background: '#6D2323',
+                  borderRadius: '3px',
+                },
+              }}>
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
                     <Typography variant="subtitle2" sx={{ fontWeight: "bold", mb: 1.5, color: "#6D2323" }}>
@@ -1545,76 +1586,90 @@ const Children = () => {
                     )}
                   </Grid>
                 </Grid>
+              </Box>
 
-                <Box sx={{ display: 'flex', gap: 2, mt: 3, justifyContent: 'flex-end' }}>
-                  {!isEditing ? (
-                    <>
-                      <Button
-                        onClick={() => handleDelete(editChild.id)}
-                        variant="outlined"
-                        startIcon={<DeleteIcon />}
-                        sx={{
-                          color: "#d32f2f",
-                          borderColor: "#d32f2f",
-                          "&:hover": {
-                            backgroundColor: "#d32f2f",
-                            color: "#fff"
-                          }
-                        }}
-                      >
-                        Delete
-                      </Button>
-                      <Button
-                        onClick={handleStartEdit}
-                        variant="contained"
-                        startIcon={<EditIcon />}
-                        sx={{ 
-                          backgroundColor: "#6D2323", 
-                          color: "#FEF9E1",
-                          "&:hover": { backgroundColor: "#5a1d1d" }
-                        }}
-                      >
-                        Edit
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button
-                        onClick={handleCancelEdit}
-                        variant="outlined"
-                        startIcon={<CancelIcon />}
-                        sx={{
-                          color: "#666",
-                          borderColor: "#666",
-                          "&:hover": {
-                            backgroundColor: "#f5f5f5"
-                          }
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={handleUpdate}
-                        variant="contained"
-                        startIcon={<SaveIcon />}
-                        disabled={!hasChanges()}
-                        sx={{ 
-                          backgroundColor: hasChanges() ? "#6D2323" : "#ccc", 
-                          color: "#FEF9E1",
-                          "&:hover": { 
-                            backgroundColor: hasChanges() ? "#5a1d1d" : "#ccc"
-                          },
-                          "&:disabled": {
-                            backgroundColor: "#ccc",
-                            color: "#999"
-                          }
-                        }}
-                      >
-                        Save
-                      </Button>
-                    </>
-                  )}
-                </Box>
+              {/* Sticky Action Buttons */}
+              <Box
+                sx={{
+                  backgroundColor: "#ffffff",
+                  borderTop: "1px solid #e0e0e0",
+                  p: 2,
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: 2,
+                  position: 'sticky',
+                  bottom: 0,
+                  zIndex: 10,
+                  boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
+                }}
+              >
+                {!isEditing ? (
+                  <>
+                    <Button
+                      onClick={() => handleDelete(editChild.id)}
+                      variant="outlined"
+                      startIcon={<DeleteIcon />}
+                      sx={{
+                        color: "#d32f2f",
+                        borderColor: "#d32f2f",
+                        "&:hover": {
+                          backgroundColor: "#d32f2f",
+                          color: "#fff"
+                        }
+                      }}
+                    >
+                      Delete
+                    </Button>
+                    <Button
+                      onClick={handleStartEdit}
+                      variant="contained"
+                      startIcon={<EditIcon />}
+                      sx={{ 
+                        backgroundColor: "#6D2323", 
+                        color: "#FEF9E1",
+                        "&:hover": { backgroundColor: "#5a1d1d" }
+                      }}
+                    >
+                      Edit
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      onClick={handleCancelEdit}
+                      variant="outlined"
+                      startIcon={<CancelIcon />}
+                      sx={{
+                        color: "#666",
+                        borderColor: "#666",
+                        "&:hover": {
+                          backgroundColor: "#f5f5f5"
+                        }
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleUpdate}
+                      variant="contained"
+                      startIcon={<SaveIcon />}
+                      disabled={!hasChanges()}
+                      sx={{ 
+                        backgroundColor: hasChanges() ? "#6D2323" : "#ccc", 
+                        color: "#FEF9E1",
+                        "&:hover": { 
+                          backgroundColor: hasChanges() ? "#5a1d1d" : "#ccc"
+                        },
+                        "&:disabled": {
+                          backgroundColor: "#ccc",
+                          color: "#999"
+                        }
+                      }}
+                    >
+                      Save
+                    </Button>
+                  </>
+                )}
               </Box>
             </>
           )}

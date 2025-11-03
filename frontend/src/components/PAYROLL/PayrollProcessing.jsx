@@ -22,9 +22,19 @@ import {
   InputAdornment,
   Button,
   Modal,
-  Grid, // Added Grid import
+  Grid,
   Checkbox,
   CircularProgress,
+  Card,
+  CardContent,
+  Chip,
+  IconButton,
+  Tooltip,
+  Divider,
+  Backdrop,
+  AppBar,
+  Toolbar,
+  Badge,
 } from '@mui/material';
 import LoadingOverlay from '../LoadingOverlay';
 import SuccessfulOverlay from '../SuccessfulOverlay';
@@ -44,6 +54,14 @@ import {
   Visibility,
   Close,
   EmojiPeople,
+  FilterList,
+  GetApp,
+  CheckCircle,
+  Error,
+  Info,
+  Refresh,
+  Dashboard,
+  Assessment,
 } from '@mui/icons-material';
 import PeopleIcon from '@mui/icons-material/People';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
@@ -74,6 +92,7 @@ const ExcelTableCell = ({ children, header, ...props }) => (
 );
 
 const PayrollProcess = () => {
+  // [All existing state variables remain the same]
   const [data, setData] = useState([]);
   const [error, setError] = useState('');
   const [departments, setDepartments] = useState([]);
@@ -81,7 +100,7 @@ const PayrollProcess = () => {
   const [filteredData, setFilteredData] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [openModal, setOpenModal] = useState(false);
-  const [editRow, setEditRow] = useState(null); // Added missing state for editRow
+  const [editRow, setEditRow] = useState(null);
   const [isPayrollProcessed, setIsPayrollProcessed] = useState(false);
   const [finalizedPayroll, setFinalizedPayroll] = useState([]);
   const [duplicateEmployeeNumbers, setDuplicateEmployeeNumbers] = useState([]);
@@ -100,7 +119,15 @@ const PayrollProcess = () => {
   const [selectedYear, setSelectedYear] = useState('');
   const [openViewModal, setOpenViewModal] = useState(false);
   const [viewRow, setViewRow] = useState(null);
+  const [summaryData, setSummaryData] = useState({
+    totalEmployees: 0,
+    processedEmployees: 0,
+    unprocessedEmployees: 0,
+    totalGrossSalary: 0,
+    totalNetSalary: 0,
+  });
 
+  // [All existing functions remain the same]
   const handleView = (rowId) => {
     const row = computedRows.find((item) => item.id === rowId);
     setViewRow(row);
@@ -139,14 +166,6 @@ const PayrollProcess = () => {
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
-    console.log(
-      'Token from localStorage:',
-      token ? 'Token exists' : 'No token found'
-    );
-    if (token) {
-      console.log('Token length:', token.length);
-      console.log('Token starts with:', token.substring(0, 20) + '...');
-    }
     return {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -228,7 +247,7 @@ const PayrollProcess = () => {
       const res = await axios.get(url, getAuthHeaders());
       console.log(res.data);
 
-      // ✅ Track duplicates
+      // Track duplicates
       const seen = new Set();
       const duplicates = new Set();
 
@@ -240,7 +259,7 @@ const PayrollProcess = () => {
         }
       });
 
-      // ✅ Normalize data
+      // Normalize data
       const allData = res.data.map((item) => ({
         ...item,
         status:
@@ -253,7 +272,30 @@ const PayrollProcess = () => {
       setFilteredData(allData);
       setData(allData);
 
-      // ✅ Check if all processed/unprocessed
+      // Calculate summary data
+      const processedCount = allData.filter(
+        (item) => item.status === 'Processed' || item.status === 1
+      ).length;
+      
+      const totalGross = allData.reduce(
+        (sum, item) => sum + parseFloat(item.grossSalary || 0),
+        0
+      );
+      
+      const totalNet = allData.reduce(
+        (sum, item) => sum + parseFloat(item.netSalary || 0),
+        0
+      );
+      
+      setSummaryData({
+        totalEmployees: allData.length,
+        processedEmployees: processedCount,
+        unprocessedEmployees: allData.length - processedCount,
+        totalGrossSalary: totalGross,
+        totalNetSalary: totalNet,
+      });
+
+      // Check if all processed/unprocessed
       const allProcessed = allData.every(
         (item) => item.status === 'Processed' || item.status === 1
       );
@@ -349,7 +391,6 @@ const PayrollProcess = () => {
   };
 
   // HANDLE SEARCH IN DEPARTMENT AND SEARCH BUTTON
-
   const handleSearchChange = (event) => {
     const term = event.target.value;
     setSearchTerm(term);
@@ -574,7 +615,7 @@ const PayrollProcess = () => {
         return;
       }
 
-      //  Update main payroll database (payroll-with-remittance)
+      // Update main payroll database (payroll-with-remittance)
       const updateErrors = [];
       for (const item of processedRowsToSubmit) {
         try {
@@ -601,7 +642,7 @@ const PayrollProcess = () => {
         // Continue with finalized payroll submission even if some updates failed
       }
 
-      //  Update finalized payroll database (finalized-payroll)
+      // Update finalized payroll database (finalized-payroll)
       console.log('Submitting to finalized payroll with audit logging...');
       const finalizedResponse = await axios.post(
         `${API_BASE_URL}/PayrollRoute/finalized-payroll`,
@@ -610,7 +651,7 @@ const PayrollProcess = () => {
       );
       console.log('Finalized payroll response:', finalizedResponse.data);
 
-      //  Update UI state with new data
+      // Update UI state with new data
       const updatedFilteredData = filteredData.map((row) => {
         const match = processedRowsToSubmit.find(
           (item) => item.employeeNumber === row.employeeNumber
@@ -666,7 +707,6 @@ const PayrollProcess = () => {
   };
 
   // Handle modal open and close
-
   const handleModalChange = (e) => {
     const { name, value } = e.target;
     setEditRow((prev) => ({
@@ -843,7 +883,6 @@ const PayrollProcess = () => {
   ];
 
   // COMPUTATION:
-
   const computedRows = filteredData.map((item) => {
     const h = item.h || 0; // Default to 0 if h is not available
     const m = item.m || 0; // Default to 0 if m is not availabl
@@ -967,292 +1006,244 @@ const PayrollProcess = () => {
   });
 
   return (
-    <Container maxWidth={false} sx={{ mt: 4, mb: 4, px: 2 }}>
-      <Paper
-        elevation={6}
-        sx={{
-          backgroundColor: '#6D2323',
-          color: '#fff',
-          p: 3,
-          borderRadius: 3,
-          borderEndEndRadius: '0',
-          borderEndStartRadius: '0',
-        }}
-      >
-        <Box display="flex" alignItems="center" gap={2}>
-          <Payment fontSize="large" />
-          <Box>
-            <Typography
-              variant="h4"
-              fontWeight="bold"
-              fontFamily="'Poppins', sans-serif"
-            >
-              Payroll | Processing
-            </Typography>
-            <Typography
-              variant="body2"
-              color="rgba(255,255,255,0.7)"
-              fontFamily="'Poppins', sans-serif"
-            >
-              Manage employee records and calculates accurately
-            </Typography>
+    <Container maxWidth={false} sx={{ px: 2, py: 3 }}>
+      {/* Header with Summary */}
+      <Paper elevation={3} sx={{ mb: 3, borderRadius: 2, overflow: 'hidden' }}>
+        <Box sx={{ bgcolor: '#6D2323', p: 2, color: 'white' }}>
+          <Box display="flex" alignItems="center" gap={2}>
+            <Payment fontSize="large" />
+            <Box>
+              <Typography variant="h5" fontWeight="bold">
+                Payroll Processing
+              </Typography>
+              <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                Manage and process employee payroll records
+              </Typography>
+            </Box>
           </Box>
         </Box>
+        
+        {/* Summary Cards */}
+        <Box sx={{ p: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          <Card sx={{ minWidth: 180, flex: 1, border: '1px solid #e0e0e0' }}>
+            <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Box>
+                  <Typography variant="caption" color="textSecondary">
+                    Total Employees
+                  </Typography>
+                  <Typography variant="h6" fontWeight="bold">
+                    {summaryData.totalEmployees}
+                  </Typography>
+                </Box>
+                <PeopleIcon color="primary" />
+              </Box>
+            </CardContent>
+          </Card>
+          
+          <Card sx={{ minWidth: 180, flex: 1, border: '1px solid #e0e0e0' }}>
+            <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Box>
+                  <Typography variant="caption" color="textSecondary">
+                    Processed
+                  </Typography>
+                  <Typography variant="h6" fontWeight="bold" color="success.main">
+                    {summaryData.processedEmployees}
+                  </Typography>
+                </Box>
+                <CheckCircleIcon color="success" />
+              </Box>
+            </CardContent>
+          </Card>
+          
+          <Card sx={{ minWidth: 180, flex: 1, border: '1px solid #e0e0e0' }}>
+            <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Box>
+                  <Typography variant="caption" color="textSecondary">
+                    Unprocessed
+                  </Typography>
+                  <Typography variant="h6" fontWeight="bold" color="warning.main">
+                    {summaryData.unprocessedEmployees}
+                  </Typography>
+                </Box>
+                <PendingIcon color="warning" />
+              </Box>
+            </CardContent>
+          </Card>
+          
+          <Card sx={{ minWidth: 180, flex: 1, border: '1px solid #e0e0e0' }}>
+            <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Box>
+                  <Typography variant="caption" color="textSecondary">
+                    Total Net Salary
+                  </Typography>
+                  <Typography variant="h6" fontWeight="bold">
+                    ₱{summaryData.totalNetSalary.toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </Typography>
+                </Box>
+                <TrendingUpIcon color="info" />
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
       </Paper>
-      <Box
-        sx={{
-          backgroundColor: 'white',
-          border: '2px solid #6D2323',
-          p: 1,
-          mt: 0,
-          mb: 2,
-        }}
-      >
-        <Box
-          sx={{
-            display: 'flex',
-            gap: 1,
-            flexWrap: 'wrap',
-            alignItems: 'center',
-          }}
-        >
-          <FormControl
-            variant="outlined"
-            sx={{
-              minWidth: 200,
-              bgcolor: '#fff',
-              border: '1px solid #6d2323',
-              borderRadius: 0,
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 0,
-              },
-            }}
-          >
-            <InputLabel id="department-label">Department</InputLabel>
-            <Select
-              labelId="department-label"
-              value={selectedDepartment}
-              onChange={handleDepartmentChange}
-              label="Department"
-            >
-              <MenuItem value="">
-                <em>All Departments</em>
-              </MenuItem>
-              {departments.map((dept) => (
-                <MenuItem key={dept.id} value={dept.code}>
-                  {dept.description}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
 
-          <FormControl
-            variant="outlined"
-            sx={{
-              minWidth: 180,
-              bgcolor: '#fff',
-              border: '1px solid #6d2323',
-              borderRadius: 0,
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 0,
-              },
-            }}
-          >
-            <InputLabel id="status-label">Status</InputLabel>
-            <Select
-              labelId="status-label"
-              value={selectedStatus}
-              onChange={handleStatusChange}
-              label="Status"
-            >
-              <MenuItem value="">
-                <em>All Status</em>
-              </MenuItem>
-              <MenuItem value="Processed">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <CheckCircleIcon sx={{ color: 'green', fontSize: 16 }} />
-                  Processed
-                </Box>
-              </MenuItem>
-              <MenuItem value="Unprocessed">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <PendingIcon sx={{ color: 'orange', fontSize: 16 }} />
-                  Unprocessed
-                </Box>
-              </MenuItem>
-            </Select>
-          </FormControl>
-
-          <FormControl
-            variant="outlined"
-            sx={{
-              minWidth: 120,
-              bgcolor: '#fff',
-              border: '1px solid #6d2323',
-              borderRadius: 0,
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 0,
-              },
-            }}
-          >
-            <InputLabel id="month-label">Month</InputLabel>
-            <Select
-              labelId="month-label"
-              value={selectedMonth}
-              onChange={handleMonthChange}
-              label="Month"
-            >
-              {monthOptions.map((option) => (
-                <MenuItem key={option.value} value={option.value}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <CalendarMonthIcon sx={{ fontSize: 16 }} />
-                    {option.label}
-                  </Box>
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <FormControl
-            variant="outlined"
-            sx={{
-              minWidth: 100,
-              bgcolor: '#fff',
-              border: '1px solid #6d2323',
-              borderRadius: 0,
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 0,
-              },
-            }}
-          >
-            <InputLabel id="year-label">Year</InputLabel>
-            <Select
-              labelId="year-label"
-              value={selectedYear}
-              onChange={handleYearChange}
-              label="Year"
-            >
-              {yearOptions.map((option) => (
-                <MenuItem key={option.value} value={option.value}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <CalendarMonthIcon sx={{ fontSize: 16 }} />
-                    {option.label}
-                  </Box>
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <TextField
-            variant="outlined"
-            placeholder={isSearching ? 'Searching...' : 'Search Name'}
-            value={searchTerm}
-            onChange={handleSearchChange}
-            disabled={isSearching}
-            sx={{
-              flex: 1,
-              minWidth: 200,
-              bgcolor: '#fff',
-              border: '1px solid #6d2323',
-              borderRadius: 0,
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 0,
-              },
-            }}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  {isSearching ? (
-                    <CircleIcon
-                      sx={{
-                        color: '#6d2323',
-                        animation: 'pulse 1s infinite',
-                        '@keyframes pulse': {
-                          '0%': { opacity: 1 },
-                          '50%': { opacity: 0.5 },
-                          '100%': { opacity: 1 },
-                        },
-                      }}
-                    />
-                  ) : (
-                    <SearchIcon />
-                  )}
-                </InputAdornment>
-              ),
-            }}
-          />
+      {/* Filters Section */}
+      <Paper elevation={1} sx={{ p: 2, mb: 2, borderRadius: 2 }}>
+        <Box display="flex" alignItems="center" gap={1} mb={2}>
+          <FilterList fontSize="small" />
+          <Typography variant="subtitle2" fontWeight="bold">
+            FILTERS
+          </Typography>
         </Box>
-      </Box>
-      {loading ? (
-        <Box display="flex" justifyContent="center" mt={10}>
-          <CircularProgress />
-        </Box>
-      ) : error ? (
-        <Alert severity="error">{error}</Alert>
-      ) : (
-        <Box>
-          {duplicateEmployeeNumbers.length > 0 && (
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              Duplicate employee number(s) found:{' '}
-              {duplicateEmployeeNumbers.join(', ')}. These rows are highlighted
-              in red.
-            </Alert>
-          )}
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <Paper
-              elevation={4}
-              sx={{
-                borderRadius: 2,
-                border: '3px solid #6d2323',
-                flex: 1,
-                minWidth: '800px',
-                maxWidth: '1600px',
-                pb: 0,
-                height: getTableHeight(),
-                display: 'flex',
-                flexDirection: 'column',
-                '& .MuiTableContainer-root': {
-                  flex: 1,
-                  '&::-webkit-scrollbar': {
-                    width: '10px',
-                    height: '5px',
-                  },
-                  '&::-webkit-scrollbar-track': {
-                    background: '#f1f1f1',
-                    borderRadius: '5px',
-                  },
-                  '&::-webkit-scrollbar-thumb': {
-                    background: '#888',
-                    borderRadius: '5px',
-                    '&:hover': {
-                      background: '#555',
-                    },
-                  },
-                },
+        
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} sm={6} md={2.4}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Department</InputLabel>
+              <Select
+                value={selectedDepartment}
+                onChange={handleDepartmentChange}
+                label="Department"
+              >
+                <MenuItem value="">
+                  <em>All Departments</em>
+                </MenuItem>
+                {departments.map((dept) => (
+                  <MenuItem key={dept.id} value={dept.code}>
+                    {dept.description}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          
+          <Grid item xs={12} sm={6} md={2.4}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Status</InputLabel>
+              <Select
+                value={selectedStatus}
+                onChange={handleStatusChange}
+                label="Status"
+              >
+                <MenuItem value="">
+                  <em>All Status</em>
+                </MenuItem>
+                <MenuItem value="Processed">Processed</MenuItem>
+                <MenuItem value="Unprocessed">Unprocessed</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          
+          <Grid item xs={12} sm={6} md={2.4}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Month</InputLabel>
+              <Select
+                value={selectedMonth}
+                onChange={handleMonthChange}
+                label="Month"
+              >
+                {monthOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          
+          <Grid item xs={12} sm={6} md={2.4}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Year</InputLabel>
+              <Select
+                value={selectedYear}
+                onChange={handleYearChange}
+                label="Year"
+              >
+                {yearOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          
+          <Grid item xs={12} sm={6} md={2.4}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Search employee..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              disabled={isSearching}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
               }}
-            >
-              <TableContainer component={Box}>
-                <Table stickyHeader>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell padding="checkbox">
-                        <Checkbox
-                          indeterminate={
-                            selectedRows.length > 0 &&
-                            selectedRows.length <
-                              computedRows.filter(
-                                (row) =>
-                                  !finalizedPayroll.some(
-                                    (fp) =>
-                                      fp.employeeNumber ===
-                                        row.employeeNumber &&
-                                      fp.startDate === row.startDate &&
-                                      fp.endDate === row.endDate
-                                  )
-                              ).length
-                          }
-                          checked={
-                            selectedRows.length ===
+            />
+          </Grid>
+        </Grid>
+      </Paper>
+
+      {/* Alerts */}
+      {duplicateEmployeeNumbers.length > 0 && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Duplicate employee number(s) found: {duplicateEmployeeNumbers.join(', ')}
+        </Alert>
+      )}
+      
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      {/* Table Section with Fixed Actions */}
+      <Paper elevation={3} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+        {/* Table Header */}
+        <Box sx={{ bgcolor: '#f5f5f5', p: 2, borderBottom: '1px solid #e0e0e0' }}>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6" fontWeight="bold">
+              Payroll Records
+            </Typography>
+            <Box display="flex" gap={1}>
+              <Badge badgeContent={selectedRows.length} color="primary">
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<Refresh />}
+                  onClick={() => fetchPayrollData()}
+                >
+                  Refresh
+                </Button>
+              </Badge>
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Table with Fixed Actions Column */}
+        <Box sx={{ display: 'flex', overflow: 'hidden' }}>
+          {/* Scrollable Table Content */}
+          <Box sx={{ overflowX: 'auto', flex: 1 }}>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        indeterminate={
+                          selectedRows.length > 0 &&
+                          selectedRows.length <
                             computedRows.filter(
                               (row) =>
                                 !finalizedPayroll.some(
@@ -1262,602 +1253,562 @@ const PayrollProcess = () => {
                                     fp.endDate === row.endDate
                                 )
                             ).length
+                        }
+                        checked={
+                          selectedRows.length ===
+                          computedRows.filter(
+                            (row) =>
+                              !finalizedPayroll.some(
+                                (fp) =>
+                                  fp.employeeNumber === row.employeeNumber &&
+                                  fp.startDate === row.startDate &&
+                                  fp.endDate === row.endDate
+                              )
+                          ).length
+                        }
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedRows(
+                              computedRows
+                                .filter(
+                                  (row) =>
+                                    !finalizedPayroll.some(
+                                      (fp) =>
+                                        fp.employeeNumber === row.employeeNumber &&
+                                        fp.startDate === row.startDate &&
+                                        fp.endDate === row.endDate
+                                    )
+                                )
+                                .map((row) => row.employeeNumber)
+                            );
+                          } else {
+                            setSelectedRows([]);
                           }
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedRows(
-                                computedRows
-                                  .filter(
-                                    (row) =>
-                                      !finalizedPayroll.some(
-                                        (fp) =>
-                                          fp.employeeNumber ===
-                                            row.employeeNumber &&
-                                          fp.startDate === row.startDate &&
-                                          fp.endDate === row.endDate
+                        }}
+                      />
+                    </TableCell>
+                    
+                    <ExcelTableCell header>No.</ExcelTableCell>
+                    <ExcelTableCell header>View</ExcelTableCell>
+                    <ExcelTableCell header>Department</ExcelTableCell>
+                    <ExcelTableCell header>Employee Number</ExcelTableCell>
+                    <ExcelTableCell header>Start Date</ExcelTableCell>
+                    <ExcelTableCell header>End Date</ExcelTableCell>
+                    <ExcelTableCell header>Name</ExcelTableCell>
+                    <ExcelTableCell header>Position</ExcelTableCell>
+                    <ExcelTableCell header>Rate NBC 594</ExcelTableCell>
+                    <ExcelTableCell header>NBC DIFF'L 597</ExcelTableCell>
+                    <ExcelTableCell header>Increment</ExcelTableCell>
+                    <ExcelTableCell header>Gross Salary</ExcelTableCell>
+                    <ExcelTableCell header>
+                      <b>ABS</b>
+                    </ExcelTableCell>
+                    <ExcelTableCell header>H</ExcelTableCell>
+                    <ExcelTableCell header>M</ExcelTableCell>
+                    <ExcelTableCell header>Net Salary</ExcelTableCell>
+                    <ExcelTableCell header>Withholding Tax</ExcelTableCell>
+                    <ExcelTableCell header>
+                      <b>Total GSIS Deductions</b>
+                    </ExcelTableCell>
+                    <ExcelTableCell header>
+                      <b>Total Pag-ibig Deductions</b>
+                    </ExcelTableCell>
+                    <ExcelTableCell header>PhilHealth</ExcelTableCell>
+                    <ExcelTableCell header>
+                      <b>Total Other Deductions</b>
+                    </ExcelTableCell>
+                    <ExcelTableCell header>
+                      <b>Total Deductions</b>
+                    </ExcelTableCell>
+                    <ExcelTableCell header>1st Pay</ExcelTableCell>
+                    <ExcelTableCell header>2nd Pay</ExcelTableCell>
+                    <ExcelTableCell header>No.</ExcelTableCell>
+                    <ExcelTableCell header>RT Ins.</ExcelTableCell>
+                    <ExcelTableCell header>EC</ExcelTableCell>
+                    <ExcelTableCell header>PhilHealth</ExcelTableCell>
+                    <ExcelTableCell header>Pag-Ibig</ExcelTableCell>
+                    <ExcelTableCell
+                      header
+                      style={{ borderLeft: '2px solid black' }}
+                    >
+                      Pay1st Compute
+                    </ExcelTableCell>
+                    <ExcelTableCell header>Pay2nd Compute</ExcelTableCell>
+                    <ExcelTableCell
+                      header
+                      style={{ borderLeft: '2px solid black' }}
+                    >
+                      No.
+                    </ExcelTableCell>
+                    <ExcelTableCell header>Name</ExcelTableCell>
+                    <ExcelTableCell>Position</ExcelTableCell>
+                    <ExcelTableCell>Withholding Tax</ExcelTableCell>
+                    <ExcelTableCell>Personal Life Ret Ins</ExcelTableCell>
+                    <ExcelTableCell>GSIS Salary Loan</ExcelTableCell>
+                    <ExcelTableCell>GSIS Policy Loan</ExcelTableCell>
+                    <ExcelTableCell>gsisArrears</ExcelTableCell>
+                    <ExcelTableCell>CPL</ExcelTableCell>
+                    <ExcelTableCell>MPL</ExcelTableCell>
+                    <ExcelTableCell> EAL</ExcelTableCell>
+                    <ExcelTableCell>MPL LITE</ExcelTableCell>
+                    <ExcelTableCell>Emergency Loan (ELA)</ExcelTableCell>
+                    <ExcelTableCell>Total GSIS Deductions</ExcelTableCell>
+                    <ExcelTableCell>
+                      Pag-ibig Fund Contribution
+                    </ExcelTableCell>
+                    <ExcelTableCell>Pag-ibig 2</ExcelTableCell>
+                    <ExcelTableCell>Multi-Purpose Loan</ExcelTableCell>
+                    <ExcelTableCell>Total Pag-Ibig Deduction</ExcelTableCell>
+                    <ExcelTableCell> PhilHealth</ExcelTableCell>
+                    <ExcelTableCell> liquidatingCash</ExcelTableCell>
+                    <ExcelTableCell>LandBank Salary Loan</ExcelTableCell>
+                    <ExcelTableCell> Earist Credit COOP.</ExcelTableCell>
+                    <ExcelTableCell> FEU</ExcelTableCell>
+                    <ExcelTableCell> Total Other Deductions</ExcelTableCell>
+                    <ExcelTableCell> Total Deductions</ExcelTableCell>
+                    <ExcelTableCell header>Status</ExcelTableCell>
+                  </TableRow>
+                </TableHead>
+
+                <TableBody>
+                  {filteredData.length > 0 ? (
+                    computedRows
+                      .slice(
+                        page * rowsPerPage,
+                        page * rowsPerPage + rowsPerPage
+                      )
+                      .map((row, index) => {
+                        const isFinalized = finalizedPayroll.some(
+                          (fp) =>
+                            fp.employeeNumber === row.employeeNumber &&
+                            fp.startDate === row.startDate &&
+                            fp.endDate === row.endDate
+                        );
+
+                        return (
+                          <TableRow
+                            key={`${row.employeeNumber}-${row.dateCreated}`}
+                            sx={{
+                              '&:hover': {
+                                backgroundColor: '#F5F5F5 !important',
+                              },
+                              backgroundColor: duplicateEmployeeNumbers.includes(
+                                row.employeeNumber
+                              )
+                                ? 'rgba(255, 0, 0, 0.1)'
+                                : 'inherit',
+                            }}
+                          >
+                            <TableCell padding="checkbox">
+                              <Checkbox
+                                checked={selectedRows.includes(
+                                  row.employeeNumber
+                                )}
+                                onChange={() => {
+                                  if (
+                                    selectedRows.includes(row.employeeNumber)
+                                  ) {
+                                    setSelectedRows((prev) =>
+                                      prev.filter(
+                                        (id) => id !== row.employeeNumber
                                       )
+                                    );
+                                  } else {
+                                    setSelectedRows((prev) => [
+                                      ...prev,
+                                      row.employeeNumber,
+                                    ]);
+                                  }
+                                }}
+                                disabled={isFinalized}
+                              />
+                            </TableCell>
+
+                            <ExcelTableCell>
+                              {page * rowsPerPage + index + 1}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              <Button
+                                onClick={() => handleView(row.id)}
+                                variant="contained"
+                                size="small"
+                                sx={{
+                                  bgcolor: '#ffffff',
+                                  color: '#6d2323',
+                                  minWidth: '80px',
+                                  border: '1px solid #6d2323',
+                                  width: '32px',
+                                  height: '32px',
+                                  padding: 0,
+                                  '&:hover': {
+                                    bgcolor: '#6d2323',
+                                    color: 'white',
+                                  },
+                                }}
+                                title="View Record"
+                              >
+                                <Visibility fontSize="small" />
+                                View
+                              </Button>
+                            </ExcelTableCell>
+                            <ExcelTableCell>{row.department}</ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.employeeNumber}
+                            </ExcelTableCell>
+                            <ExcelTableCell>{row.startDate}</ExcelTableCell>
+                            <ExcelTableCell>{row.endDate}</ExcelTableCell>
+                            <ExcelTableCell>{row.name}</ExcelTableCell>
+                            <ExcelTableCell>{row.position}</ExcelTableCell>
+
+                            <ExcelTableCell>
+                              {row.rateNbc594
+                                ? Number(row.rateNbc594).toLocaleString(
+                                    'en-US',
+                                    {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    }
                                   )
-                                  .map((row) => row.employeeNumber)
-                              );
-                            } else {
-                              setSelectedRows([]);
-                            }
-                          }}
-                        />
-                      </TableCell>
-
-                      <ExcelTableCell header>No.</ExcelTableCell>
-                      <ExcelTableCell header>View</ExcelTableCell>
-                      <ExcelTableCell header>Department</ExcelTableCell>
-                      <ExcelTableCell header>Employee Number</ExcelTableCell>
-                      <ExcelTableCell header>Start Date</ExcelTableCell>
-                      <ExcelTableCell header>End Date</ExcelTableCell>
-                      <ExcelTableCell header>Name</ExcelTableCell>
-                      <ExcelTableCell header>Position</ExcelTableCell>
-                      <ExcelTableCell header>Rate NBC 594</ExcelTableCell>
-                      <ExcelTableCell header>NBC DIFF'L 597</ExcelTableCell>
-                      <ExcelTableCell header>Increment</ExcelTableCell>
-                      <ExcelTableCell header>Gross Salary</ExcelTableCell>
-                      <ExcelTableCell header>
-                        <b>ABS</b>
-                      </ExcelTableCell>
-                      <ExcelTableCell header>H</ExcelTableCell>
-                      <ExcelTableCell header>M</ExcelTableCell>
-                      <ExcelTableCell header>Net Salary</ExcelTableCell>
-                      <ExcelTableCell header>Withholding Tax</ExcelTableCell>
-                      <ExcelTableCell header>
-                        <b>Total GSIS Deductions</b>
-                      </ExcelTableCell>
-                      <ExcelTableCell header>
-                        <b>Total Pag-ibig Deductions</b>
-                      </ExcelTableCell>
-                      <ExcelTableCell header>PhilHealth</ExcelTableCell>
-                      <ExcelTableCell header>
-                        {' '}
-                        <b>Total Other Deductions</b>
-                      </ExcelTableCell>
-                      <ExcelTableCell header>
-                        <b>Total Deductions</b>
-                      </ExcelTableCell>
-                      <ExcelTableCell header>1st Pay</ExcelTableCell>
-                      <ExcelTableCell header>2nd Pay</ExcelTableCell>
-                      <ExcelTableCell header>No.</ExcelTableCell>
-                      <ExcelTableCell header>RT Ins.</ExcelTableCell>
-                      <ExcelTableCell header>EC</ExcelTableCell>
-                      <ExcelTableCell header>PhilHealth</ExcelTableCell>
-                      <ExcelTableCell header>Pag-Ibig</ExcelTableCell>
-                      <ExcelTableCell
-                        header
-                        style={{ borderLeft: '2px solid black' }}
-                      >
-                        Pay1st Compute
-                      </ExcelTableCell>
-                      <ExcelTableCell header>Pay2nd Compute</ExcelTableCell>
-                      <ExcelTableCell
-                        header
-                        style={{ borderLeft: '2px solid black' }}
-                      >
-                        No.
-                      </ExcelTableCell>
-                      <ExcelTableCell header>Name</ExcelTableCell>
-                      <ExcelTableCell>Position</ExcelTableCell>
-                      <ExcelTableCell>Withholding Tax</ExcelTableCell>
-                      <ExcelTableCell>Personal Life Ret Ins</ExcelTableCell>
-                      <ExcelTableCell>GSIS Salary Loan</ExcelTableCell>
-                      <ExcelTableCell>GSIS Policy Loan</ExcelTableCell>
-                      <ExcelTableCell>gsisArrears</ExcelTableCell>
-                      <ExcelTableCell>CPL</ExcelTableCell>
-                      <ExcelTableCell>MPL</ExcelTableCell>
-                      <ExcelTableCell> EAL</ExcelTableCell>
-                      <ExcelTableCell>MPL LITE</ExcelTableCell>
-                      <ExcelTableCell>Emergency Loan (ELA)</ExcelTableCell>
-                      <ExcelTableCell>Total GSIS Deductions</ExcelTableCell>
-                      <ExcelTableCell>
-                        Pag-ibig Fund Contribution
-                      </ExcelTableCell>
-                      <ExcelTableCell>Pag-ibig 2</ExcelTableCell>
-                      <ExcelTableCell>Multi-Purpose Loan</ExcelTableCell>
-                      <ExcelTableCell>Total Pag-Ibig Deduction</ExcelTableCell>
-                      <ExcelTableCell> PhilHealth</ExcelTableCell>
-                      <ExcelTableCell> liquidatingCash</ExcelTableCell>
-                      <ExcelTableCell>LandBank Salary Loan</ExcelTableCell>
-                      <ExcelTableCell> Earist Credit COOP.</ExcelTableCell>
-                      <ExcelTableCell> FEU</ExcelTableCell>
-                      <ExcelTableCell> Total Other Deductions</ExcelTableCell>
-                      <ExcelTableCell> Total Deductions</ExcelTableCell>
-                      <ExcelTableCell header>Status</ExcelTableCell>
-                    </TableRow>
-                  </TableHead>
-
-                  <TableBody>
-                    {filteredData.length > 0 ? (
-                      computedRows
-                        .slice(
-                          page * rowsPerPage,
-                          page * rowsPerPage + rowsPerPage
-                        )
-                        .map((row, index) => {
-                          const isFinalized = finalizedPayroll.some(
-                            (fp) =>
-                              fp.employeeNumber === row.employeeNumber &&
-                              fp.startDate === row.startDate &&
-                              fp.endDate === row.endDate
-                          );
-
-                          return (
-                            <TableRow
-                              key={`${row.employeeNumber}-${row.dateCreated}`}
+                                : ''}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.nbcDiffl597
+                                ? Number(row.nbcDiffl597).toLocaleString(
+                                    'en-US',
+                                    {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    }
+                                  )
+                                : ''}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.increment
+                                ? Number(row.increment).toLocaleString(
+                                    'en-US',
+                                    {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    }
+                                  )
+                                : ''}
+                            </ExcelTableCell>
+                            <ExcelTableCell>{row.grossSalary}</ExcelTableCell>
+                            <ExcelTableCell>
+                              <b>{row.abs}</b>
+                            </ExcelTableCell>
+                            <ExcelTableCell>{row.h}</ExcelTableCell>
+                            <ExcelTableCell>{row.m}</ExcelTableCell>
+                            <ExcelTableCell>{row.netSalary}</ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.withholdingTax}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.totalGsisDeds}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.totalPagibigDeds}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.PhilHealthContribution}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.totalOtherDeds}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.totalDeductions}
+                            </ExcelTableCell>
+                            <ExcelTableCell
+                              sx={{ color: 'red', fontWeight: 'bold' }}
+                            >
+                              {row.pay1st}
+                            </ExcelTableCell>
+                            <ExcelTableCell
+                              sx={{ color: 'red', fontWeight: 'bold' }}
+                            >
+                              {row.pay2nd}
+                            </ExcelTableCell>
+                            <ExcelTableCell>{index + 1}</ExcelTableCell>
+                            <ExcelTableCell>{row.rtIns}</ExcelTableCell>
+                            <ExcelTableCell>{row.ec}</ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.PhilHealthContribution}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.pagibigFundCont}
+                            </ExcelTableCell>
+                            <ExcelTableCell
                               sx={{
-                                '&:hover': {
-                                  backgroundColor: '#F5F5F5 !important',
-                                },
+                                borderLeft: '2px solid black',
+                                color: 'red',
+                                fontWeight: 'bold',
                               }}
                             >
-                              <TableCell padding="checkbox">
-                                <Checkbox
-                                  checked={selectedRows.includes(
-                                    row.employeeNumber
-                                  )}
-                                  onChange={() => {
-                                    if (
-                                      selectedRows.includes(row.employeeNumber)
-                                    ) {
-                                      setSelectedRows((prev) =>
-                                        prev.filter(
-                                          (id) => id !== row.employeeNumber
-                                        )
-                                      );
-                                    } else {
-                                      setSelectedRows((prev) => [
-                                        ...prev,
-                                        row.employeeNumber,
-                                      ]);
+                              {row.pay1stCompute}
+                            </ExcelTableCell>
+                            <ExcelTableCell
+                              sx={{ color: 'red', fontWeight: 'bold' }}
+                            >
+                              {row.pay2ndCompute}
+                            </ExcelTableCell>
+                            <ExcelTableCell
+                              sx={{ borderLeft: '2px solid black' }}
+                            >
+                              {index + 1}
+                            </ExcelTableCell>
+                            <ExcelTableCell>{row.name}</ExcelTableCell>
+                            <ExcelTableCell>{row.position}</ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.withholdingTax
+                                ? Number(row.withholdingTax).toLocaleString(
+                                    'en-US',
+                                    {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
                                     }
-                                  }}
-                                  disabled={isFinalized}
-                                />
-                              </TableCell>
+                                  )
+                                : ''}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.personalLifeRetIns}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.gsisSalaryLoan
+                                ? Number(row.gsisSalaryLoan).toLocaleString(
+                                    'en-US',
+                                    {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    }
+                                  )
+                                : ''}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.gsisPolicyLoan
+                                ? Number(row.gsisPolicyLoan).toLocaleString(
+                                    'en-US',
+                                    {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    }
+                                  )
+                                : ''}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.gsisArrears
+                                ? Number(row.gsisArrears).toLocaleString(
+                                    'en-US',
+                                    {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    }
+                                  )
+                                : ''}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.cpl
+                                ? Number(row.cpl).toLocaleString('en-US', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })
+                                : ''}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.mpl
+                                ? Number(row.mpl).toLocaleString('en-US', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })
+                                : ''}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.eal
+                                ? Number(row.eal).toLocaleString('en-US', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })
+                                : ''}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.mplLite
+                                ? Number(row.mplLite).toLocaleString(
+                                    'en-US',
+                                    {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    }
+                                  )
+                                : ''}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.emergencyLoan
+                                ? Number(row.emergencyLoan).toLocaleString(
+                                    'en-US',
+                                    {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    }
+                                  )
+                                : ''}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.totalGsisDeds}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.pagibigFundCont
+                                ? Number(row.pagibigFundCont).toLocaleString(
+                                    'en-US',
+                                    {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    }
+                                  )
+                                : ''}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.pagibig2
+                                ? Number(row.pagibig2).toLocaleString(
+                                    'en-US',
+                                    {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    }
+                                  )
+                                : ''}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.multiPurpLoan
+                                ? Number(row.multiPurpLoan).toLocaleString(
+                                    'en-US',
+                                    {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    }
+                                  )
+                                : ''}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.totalPagibigDeds}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.PhilHealthContribution}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.liquidatingCash
+                                ? Number(row.liquidatingCash).toLocaleString(
+                                    'en-US',
+                                    {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    }
+                                  )
+                                : ''}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.landbankSalaryLoan
+                                ? Number(
+                                    row.landbankSalaryLoan
+                                  ).toLocaleString('en-US', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })
+                                : ''}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.earistCreditCoop
+                                ? Number(row.earistCreditCoop).toLocaleString(
+                                    'en-US',
+                                    {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    }
+                                  )
+                                : ''}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.feu
+                                ? Number(row.feu).toLocaleString('en-US', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })
+                                : ''}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.totalOtherDeds}
+                            </ExcelTableCell>
+                            <ExcelTableCell>
+                              {row.totalDeductions}
+                            </ExcelTableCell>
+                            <ExcelTableCell
+                              sx={{
+                                fontWeight: 'bold',
+                                color:
+                                  row.status === 'Processed'
+                                    ? 'green'
+                                    : 'red',
+                              }}
+                            >
+                              <Chip
+                                label={row.status}
+                                color={row.status === 'Processed' ? 'success' : 'warning'}
+                                size="small"
+                              />
+                            </ExcelTableCell>
+                          </TableRow>
+                        );
+                      })
+                  ) : (
+                    <TableRow>
+                      <ExcelTableCell colSpan={50} align="center">
+                        No payroll records available.
+                      </ExcelTableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
 
-                              <ExcelTableCell>
-                                {page * rowsPerPage + index + 1}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                <Button
-                                  onClick={() => handleView(row.id)}
-                                  variant="contained"
-                                  size="small"
-                                  sx={{
-                                    bgcolor: '#ffffff',
-                                    color: '#6d2323',
-                                    minWidth: '80px',
-                                    border: '1px solid #6d2323',
-                                    width: '32px',
-                                    height: '32px',
-                                    padding: 0,
-                                    '&:hover': {
-                                      bgcolor: '#6d2323',
-                                      color: 'white',
-                                    },
-                                  }}
-                                  title="View Record"
-                                >
-                                  <Visibility fontSize="small" />
-                                  View
-                                </Button>
-                              </ExcelTableCell>
-                              <ExcelTableCell>{row.department}</ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.employeeNumber}
-                              </ExcelTableCell>
-                              <ExcelTableCell>{row.startDate}</ExcelTableCell>
-                              <ExcelTableCell>{row.endDate}</ExcelTableCell>
-                              <ExcelTableCell>{row.name}</ExcelTableCell>
-                              <ExcelTableCell>{row.position}</ExcelTableCell>
-
-                              <ExcelTableCell>
-                                {row.rateNbc594
-                                  ? Number(row.rateNbc594).toLocaleString(
-                                      'en-US',
-                                      {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      }
-                                    )
-                                  : ''}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.nbcDiffl597
-                                  ? Number(row.nbcDiffl597).toLocaleString(
-                                      'en-US',
-                                      {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      }
-                                    )
-                                  : ''}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.increment
-                                  ? Number(row.increment).toLocaleString(
-                                      'en-US',
-                                      {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      }
-                                    )
-                                  : ''}
-                              </ExcelTableCell>
-                              <ExcelTableCell>{row.grossSalary}</ExcelTableCell>
-                              <ExcelTableCell>
-                                <b>{row.abs}</b>
-                              </ExcelTableCell>
-                              <ExcelTableCell>{row.h}</ExcelTableCell>
-                              <ExcelTableCell>{row.m}</ExcelTableCell>
-                              <ExcelTableCell>{row.netSalary}</ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.withholdingTax}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.totalGsisDeds}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.totalPagibigDeds}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.PhilHealthContribution}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.totalOtherDeds}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.totalDeductions}
-                              </ExcelTableCell>
-                              <ExcelTableCell
-                                sx={{ color: 'red', fontWeight: 'bold' }}
-                              >
-                                {row.pay1st}
-                              </ExcelTableCell>
-                              <ExcelTableCell
-                                sx={{ color: 'red', fontWeight: 'bold' }}
-                              >
-                                {row.pay2nd}
-                              </ExcelTableCell>
-                              <ExcelTableCell>{index + 1}</ExcelTableCell>
-                              <ExcelTableCell>{row.rtIns}</ExcelTableCell>
-                              <ExcelTableCell>{row.ec}</ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.PhilHealthContribution}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.pagibigFundCont}
-                              </ExcelTableCell>
-                              <ExcelTableCell
-                                sx={{
-                                  borderLeft: '2px solid black',
-                                  color: 'red',
-                                  fontWeight: 'bold',
-                                }}
-                              >
-                                {row.pay1stCompute}
-                              </ExcelTableCell>
-                              <ExcelTableCell
-                                sx={{ color: 'red', fontWeight: 'bold' }}
-                              >
-                                {row.pay2ndCompute}
-                              </ExcelTableCell>
-                              <ExcelTableCell
-                                sx={{ borderLeft: '2px solid black' }}
-                              >
-                                {index + 1}
-                              </ExcelTableCell>
-                              <ExcelTableCell>{row.name}</ExcelTableCell>
-                              <ExcelTableCell>{row.position}</ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.withholdingTax
-                                  ? Number(row.withholdingTax).toLocaleString(
-                                      'en-US',
-                                      {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      }
-                                    )
-                                  : ''}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.personalLifeRetIns}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.gsisSalaryLoan
-                                  ? Number(row.gsisSalaryLoan).toLocaleString(
-                                      'en-US',
-                                      {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      }
-                                    )
-                                  : ''}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.gsisPolicyLoan
-                                  ? Number(row.gsisPolicyLoan).toLocaleString(
-                                      'en-US',
-                                      {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      }
-                                    )
-                                  : ''}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.gsisArrears
-                                  ? Number(row.gsisArrears).toLocaleString(
-                                      'en-US',
-                                      {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      }
-                                    )
-                                  : ''}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.cpl
-                                  ? Number(row.cpl).toLocaleString('en-US', {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    })
-                                  : ''}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.mpl
-                                  ? Number(row.mpl).toLocaleString('en-US', {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    })
-                                  : ''}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.eal
-                                  ? Number(row.eal).toLocaleString('en-US', {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    })
-                                  : ''}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.mplLite
-                                  ? Number(row.mplLite).toLocaleString(
-                                      'en-US',
-                                      {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      }
-                                    )
-                                  : ''}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.emergencyLoan
-                                  ? Number(row.emergencyLoan).toLocaleString(
-                                      'en-US',
-                                      {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      }
-                                    )
-                                  : ''}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.totalGsisDeds}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.pagibigFundCont
-                                  ? Number(row.pagibigFundCont).toLocaleString(
-                                      'en-US',
-                                      {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      }
-                                    )
-                                  : ''}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.pagibig2
-                                  ? Number(row.pagibig2).toLocaleString(
-                                      'en-US',
-                                      {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      }
-                                    )
-                                  : ''}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.multiPurpLoan
-                                  ? Number(row.multiPurpLoan).toLocaleString(
-                                      'en-US',
-                                      {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      }
-                                    )
-                                  : ''}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.totalPagibigDeds}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.PhilHealthContribution}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.liquidatingCash
-                                  ? Number(row.liquidatingCash).toLocaleString(
-                                      'en-US',
-                                      {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      }
-                                    )
-                                  : ''}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.landbankSalaryLoan
-                                  ? Number(
-                                      row.landbankSalaryLoan
-                                    ).toLocaleString('en-US', {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    })
-                                  : ''}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.earistCreditCoop
-                                  ? Number(row.earistCreditCoop).toLocaleString(
-                                      'en-US',
-                                      {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      }
-                                    )
-                                  : ''}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.feu
-                                  ? Number(row.feu).toLocaleString('en-US', {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    })
-                                  : ''}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.totalOtherDeds}
-                              </ExcelTableCell>
-                              <ExcelTableCell>
-                                {row.totalDeductions}
-                              </ExcelTableCell>
-                              <ExcelTableCell
-                                sx={{
-                                  fontWeight: 'bold',
-                                  color:
-                                    row.status === 'Processed'
-                                      ? 'green'
-                                      : 'red',
-                                }}
-                              >
-                                {row.status}
-                              </ExcelTableCell>
-                            </TableRow>
-                          );
-                        })
-                    ) : (
-                      <TableRow>
-                        <ExcelTableCell colSpan={13} align="center">
-                          No payroll records available.
-                        </ExcelTableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  borderTop: '1px solid #E0E0E0',
-                  px: 2,
-                  py: 1,
-                }}
-              >
-                <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-                  <Typography
-                    variant="body2"
-                    sx={{ fontWeight: 'bold', color: '#6d2323' }}
+          {/* Fixed Actions Column */}
+          <Box
+            sx={{
+              width: '120px',
+              minWidth: '120px',
+              borderLeft: '2px solid #e0e0e0',
+              backgroundColor: '#f9f9f9',
+              position: 'sticky',
+              right: 0,
+              zIndex: 1,
+              boxShadow: '-2px 0 5px rgba(0,0,0,0.1)',
+            }}
+          >
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell
+                    sx={{
+                      backgroundColor: '#F5F5F5',
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      borderBottom: '1px solid #E0E0E0',
+                      padding: '8px',
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: 2,
+                    }}
                   >
-                    Total Records: {filteredData.length}
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{ fontWeight: 'bold', color: '#6d2323' }}
-                  >
-                    Selected: {selectedRows.length}
-                  </Typography>
-                </Box>
-                <TablePagination
-                  component="div"
-                  count={filteredData.length}
-                  page={page}
-                  onPageChange={handleChangePage}
-                  rowsPerPage={rowsPerPage}
-                  onRowsPerPageChange={handleChangeRowsPerPage}
-                  rowsPerPageOptions={[10, 25, 50, 100]}
-                  sx={{
-                    '.MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows':
-                      {
-                        my: 'auto',
-                      },
-                  }}
-                />
-              </Box>
-            </Paper>
-
-            <Paper
-              elevation={4}
-              sx={{
-                borderRadius: 2,
-                width: '120px',
-                height: getTableHeight(),
-                display: 'flex',
-                flexDirection: 'column',
-                border: '3px solid #6d2323',
-              }}
-            >
-              <Box
-                sx={{
-                  p: 1,
-                  borderBottom: '2px solid black',
-                  pb: '20px',
-                  bgcolor: '#ffffff',
-                  height: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Typography
-                  variant="subtitle2"
-                  fontWeight="bold"
-                  sx={{ mt: '15px', fontSize: '0.75rem' }}
-                >
-                  Actions
-                </Typography>
-              </Box>
-
-              <Box
-                sx={{
-                  flex: 1,
-                  overflowY: 'auto',
-                  borderTop: '1px solid #E0E0E0',
-                  '&::-webkit-scrollbar': {
-                    width: '10px',
-                    height: '10px',
-                  },
-                  '&::-webkit-scrollbar-track': {
-                    background: '#f1f1f1',
-                    borderRadius: '5px',
-                  },
-                  '&::-webkit-scrollbar-thumb': {
-                    background: '#888',
-                    borderRadius: '5px',
-                    '&:hover': {
-                      background: '#555',
-                    },
-                  },
-                }}
-              >
-                {computedRows.length > 0 ? (
+                    Actions
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredData.length > 0 ? (
                   computedRows
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((row) => {
+                    .slice(
+                      page * rowsPerPage,
+                      page * rowsPerPage + rowsPerPage
+                    )
+                    .map((row, index) => {
                       const isFinalized = finalizedPayroll.some(
                         (fp) =>
                           fp.employeeNumber === row.employeeNumber &&
@@ -1866,141 +1817,154 @@ const PayrollProcess = () => {
                       );
 
                       return (
-                        <Box
-                          key={`${row.employeeNumber}-${row.dateCreated}`}
+                        <TableRow
+                          key={`actions-${row.employeeNumber}-${row.dateCreated}`}
                           sx={{
-                            height: '42px', // Match table row height exactly
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            borderBottom: '1px solid #E0E0E0',
-                            borderRight: '1px solid #E0E0E0',
-                            borderLeft: '1px solid #E0E0E0',
-                            margin: 0,
-                            padding: 0,
-                            '&:nth-of-type(odd)': {
-                              backgroundColor: '#FAFAFA',
-                            },
                             '&:hover': {
-                              backgroundColor: '#F5F5F5',
+                              backgroundColor: '#F5F5F5 !important',
                             },
+                            backgroundColor: duplicateEmployeeNumbers.includes(
+                              row.employeeNumber
+                            )
+                              ? 'rgba(255, 0, 0, 0.1)'
+                              : 'inherit',
+                            height: '53px',
                           }}
                         >
-                          <Box
+                          <TableCell
                             sx={{
-                              display: 'flex',
-                              gap: '8px',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '100%',
+                              padding: '8px',
+                              textAlign: 'center',
+                              borderBottom: '1px solid #E0E0E0',
                             }}
                           >
-                            <Button
-                              onClick={() => handleEdit(row.id)}
-                              variant="contained"
-                              disabled={isFinalized}
-                              sx={{
-                                bgcolor: isFinalized ? '#D3D3D3' : '#6d2323',
-                                color: isFinalized ? '#A9A9A9' : '#ffffff',
-                                minWidth: '30px',
-                                width: '32px',
-                                height: '32px',
-                                padding: 0,
-                                opacity: isFinalized ? 0.6 : 1,
-                                pointerEvents: isFinalized ? 'none' : 'auto',
-                                '&:hover': {
-                                  bgcolor: isFinalized ? '#D3D3D3' : '#A31D1D',
-                                },
-                              }}
-                              title="Edit Record"
-                            >
-                              <EditIcon fontSize="small" />
-                            </Button>
-
-                            <Button
-                              onClick={() =>
-                                handleDelete(row.id, row.employeeNumber)
-                              }
-                              variant="contained"
-                              disabled={isFinalized}
-                              sx={{
-                                bgcolor: isFinalized ? '#D3D3D3' : '#d32f2f',
-                                color: isFinalized ? '#A9A9A9' : '#ffffff',
-                                minWidth: '32px',
-                                width: '32px',
-                                height: '32px',
-                                padding: 0,
-                                opacity: isFinalized ? 0.6 : 1,
-                                pointerEvents: isFinalized ? 'none' : 'auto',
-                                '&:hover': {
-                                  bgcolor: isFinalized ? '#D3D3D3' : '#b71c1c',
-                                },
-                              }}
-                              title="Delete Record"
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </Button>
-                          </Box>
-                        </Box>
+                            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
+                              <Tooltip title="Edit Record">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleEdit(row.id)}
+                                  disabled={isFinalized}
+                                  sx={{
+                                    color: isFinalized ? '#ccc' : '#6d2323',
+                                    backgroundColor: isFinalized ? '#f5f5f5' : 'white',
+                                    border: '1px solid #6d2323',
+                                    '&:hover': {
+                                      backgroundColor: isFinalized ? '#f5f5f5' : 'rgba(109, 35, 35, 0.1)',
+                                    },
+                                    padding: '4px',
+                                  }}
+                                >
+                                  <EditIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Delete Record">
+                                <IconButton
+                                  size="small"
+                                  onClick={() =>
+                                    handleDelete(row.id, row.employeeNumber)
+                                  }
+                                  disabled={isFinalized}
+                                  sx={{
+                                    color: isFinalized ? '#ccc' : '#d32f2f',
+                                    backgroundColor: isFinalized ? '#f5f5f5' : 'white',
+                                    border: '1px solid #d32f2f',
+                                    '&:hover': {
+                                      backgroundColor: isFinalized ? '#f5f5f5' : 'rgba(211, 47, 47, 0.1)',
+                                    },
+                                    padding: '4px',
+                                  }}
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
                       );
                     })
                 ) : (
-                  <Box sx={{ p: 2, textAlign: 'center' }}>No records</Box>
+                  <TableRow>
+                    <TableCell
+                      sx={{
+                        textAlign: 'center',
+                        borderBottom: '1px solid #E0E0E0',
+                        padding: '8px',
+                      }}
+                    >
+                      No actions
+                    </TableCell>
+                  </TableRow>
                 )}
-              </Box>
-            </Paper>
+              </TableBody>
+            </Table>
           </Box>
         </Box>
-      )}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'flex-end',
-          marginTop: '16px',
-          gap: '12px',
-        }}
-      >
+
+        {/* Table Footer */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderTop: '1px solid #E0E0E0',
+            px: 2,
+            py: 1,
+            bgcolor: '#f5f5f5',
+          }}
+        >
+          <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+              Total Records: {filteredData.length}
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+              Selected: {selectedRows.length}
+            </Typography>
+          </Box>
+          <TablePagination
+            component="div"
+            count={filteredData.length}
+            page={page}
+            onPageChange={handleChangePage}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+            rowsPerPageOptions={[10, 25, 50, 100]}
+          />
+        </Box>
+      </Paper>
+
+      {/* Action Buttons */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3, gap: 2 }}>
         <Button
           variant="contained"
-          color="success"
           onClick={() => setShowConfirmation(true)}
           disabled={!canSubmit}
-          size="medium"
+          size="large"
           sx={{
             backgroundColor: '#6d2323',
-            color: canSubmit ? '#ffffff' : '#0c0b0bff',
-            textTransform: 'none',
-            opacity: canSubmit ? 1 : 0.6,
-            pointerEvents: canSubmit ? 'auto' : 'none',
-            '&:hover': {
-              backgroundColor: '#a31d1d',
-            },
+            '&:hover': { backgroundColor: '#5a1e1e' },
+            '&:disabled': { backgroundColor: '#ccc', color: '#666' },
           }}
           startIcon={<ExitToApp />}
         >
-          Export Payroll Records
+          Export Payroll Records ({selectedRows.length})
         </Button>
 
         <Button
-          variant="contained"
-          color="success"
+          variant="outlined"
           onClick={() => (window.location.href = '/payroll-processed')}
-          size="medium"
+          size="large"
           sx={{
-            backgroundColor: '#ffffff',
+            borderColor: '#6d2323',
             color: '#6d2323',
-            textTransform: 'none',
-            border: '1px solid #6d2323',
-            '&:hover': {
-              backgroundColor: '#a31d1d',
-              color: 'white',
-            },
+            '&:hover': { borderColor: '#5a1e1e', backgroundColor: '#f5f5f5' },
           }}
           startIcon={<CreditCard />}
         >
           View Processed Payroll
         </Button>
-      </div>
+      </Box>
+
+      {/* [All existing modals remain the same - Edit Modal, View Modal, Confirmation Modal] */}
       <Modal open={openModal} onClose={handleCancel}>
         <Box
           sx={{
@@ -3080,8 +3044,7 @@ const PayrollProcess = () => {
                 }}
               >
                 <Typography variant="body2" color="text.secondary">
-                  💡 Tip: Compare original values on the left with your edits on
-                  the right
+                  💡 Tip: Compare original values on the left with your edits on the right
                 </Typography>
                 <Box display="flex" gap={2}>
                   <Button
@@ -3121,163 +3084,6 @@ const PayrollProcess = () => {
               </Box>
             </>
           )}
-        </Box>
-      </Modal>
-
-      <Modal open={showConfirmation} onClose={() => setShowConfirmation(false)}>
-        <Box
-          sx={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            bgcolor: '#ffffff',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-            p: 8,
-            borderRadius: 3,
-            textAlign: 'center',
-            width: 440,
-            border: '1.5px solid #6d2323',
-          }}
-        >
-          {/* Centered Animated Icon */}
-          <Box
-            sx={{
-              position: 'relative',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              mb: 3,
-            }}
-          >
-            {/* Circular Loading Ring */}
-            <Box
-              sx={{
-                position: 'absolute',
-                width: 92,
-                height: 92,
-                borderRadius: '50%',
-                border: '3px solid transparent',
-                borderTopColor: '#6d2323',
-                borderRightColor: '#6d2323',
-                animation: 'spin 2.4s linear infinite',
-                '@keyframes spin': {
-                  '0%': { transform: 'rotate(0deg)' },
-                  '100%': { transform: 'rotate(360deg)' },
-                },
-              }}
-            />
-
-            {/* Pulsing Icon Background */}
-            <Box
-              sx={{
-                backgroundColor: '#6d232320',
-                borderRadius: '50%',
-                width: 80,
-                height: 80,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                animation: 'pulse 2s ease-in-out infinite',
-                '@keyframes pulse': {
-                  '0%': {
-                    transform: 'scale(1)',
-                    boxShadow: '0 0 0 0 rgba(109, 35, 35, 0.4)',
-                  },
-                  '50%': {
-                    transform: 'scale(1.08)',
-                    boxShadow: '0 0 0 10px rgba(109, 35, 35, 0)',
-                  },
-                  '100%': {
-                    transform: 'scale(1)',
-                    boxShadow: '0 0 0 0 rgba(109, 35, 35, 0)',
-                  },
-                },
-              }}
-            >
-              <Payment sx={{ fontSize: 44, color: '#6d2323' }} />
-            </Box>
-          </Box>
-
-          {/* Title and Text */}
-          <Typography
-            variant="h6"
-            sx={{
-              color: '#6d2323',
-              mb: 1,
-              fontWeight: 'bold',
-            }}
-          >
-            Confirm Submission
-          </Typography>
-
-          <Typography
-            variant="body2"
-            sx={{
-              color: 'black',
-              mb: 3,
-              px: 2,
-              pb: 1,
-            }}
-          >
-            Please ensure that all payroll information has been reviewed and
-            verified. Do you wish to proceed with the submission?
-          </Typography>
-
-          {/* Buttons */}
-          <Box display="flex" justifyContent="center" gap={2}>
-            <Button
-              variant="outlined"
-              onClick={() => setShowConfirmation(false)}
-              disabled={isSubmitting}
-              sx={{
-                color: '#6d2323',
-                borderColor: '#6d2323',
-                '&:hover': {
-                  borderColor: '#6d2323',
-                  backgroundColor: '#6d232310',
-                },
-                px: 3,
-              }}
-            >
-              CANCEL
-            </Button>
-            <Button
-              variant="contained"
-              disabled={isSubmitting}
-              onClick={async () => {
-                setIsSubmitting(true);
-                setShowConfirmation(false);
-                setLoading(true);
-
-                try {
-                  await handleSubmitPayroll();
-                  setTimeout(() => {
-                    setLoading(false);
-                    setSuccessAction('export');
-                    setSuccessOpen(true);
-                    setTimeout(() => {
-                      setSuccessOpen(false);
-                      window.location.href = '/payroll-processed';
-                    }, 2500);
-                  }, 2500);
-                } catch (error) {
-                  console.error('Error exporting payroll:', error);
-                  setLoading(false);
-                  alert('Failed to export payroll records. Please try again.');
-                } finally {
-                  setIsSubmitting(false);
-                }
-              }}
-              sx={{
-                backgroundColor: '#6d2323',
-                width: 120,
-                '&:hover': { backgroundColor: '#5b1d1d' },
-              }}
-            >
-              YES
-            </Button>
-          </Box>
         </Box>
       </Modal>
 
@@ -3744,10 +3550,13 @@ const PayrollProcess = () => {
                       </Typography>
                       <Typography variant="body2" fontWeight="500">
                         {viewRow.mplLite
-                          ? Number(viewRow.mplLite).toLocaleString('en-US', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })
+                          ? Number(viewRow.mplLite).toLocaleString(
+                              'en-US',
+                              {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              }
+                            )
                           : '0.00'}
                       </Typography>
                     </Grid>
@@ -4069,6 +3878,164 @@ const PayrollProcess = () => {
           )}
         </Box>
       </Modal>
+
+      <Modal open={showConfirmation} onClose={() => setShowConfirmation(false)}>
+        <Box
+          sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            bgcolor: '#ffffff',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+            p: 8,
+            borderRadius: 3,
+            textAlign: 'center',
+            width: 440,
+            border: '1.5px solid #6d2323',
+          }}
+        >
+          {/* Centered Animated Icon */}
+          <Box
+            sx={{
+              position: 'relative',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              mb: 3,
+            }}
+          >
+            {/* Circular Loading Ring */}
+            <Box
+              sx={{
+                position: 'absolute',
+                width: 92,
+                height: 92,
+                borderRadius: '50%',
+                border: '3px solid transparent',
+                borderTopColor: '#6d2323',
+                borderRightColor: '#6d2323',
+                animation: 'spin 2.4s linear infinite',
+                '@keyframes spin': {
+                  '0%': { transform: 'rotate(0deg)' },
+                  '100%': { transform: 'rotate(360deg)' },
+                },
+              }}
+            />
+
+            {/* Pulsing Icon Background */}
+            <Box
+              sx={{
+                backgroundColor: '#6d232320',
+                borderRadius: '50%',
+                width: 80,
+                height: 80,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                animation: 'pulse 2s ease-in-out infinite',
+                '@keyframes pulse': {
+                  '0%': {
+                    transform: 'scale(1)',
+                    boxShadow: '0 0 0 0 rgba(109, 35, 35, 0.4)',
+                  },
+                  '50%': {
+                    transform: 'scale(1.08)',
+                    boxShadow: '0 0 0 10px rgba(109, 35, 35, 0)',
+                  },
+                  '100%': {
+                    transform: 'scale(1)',
+                    boxShadow: '0 0 0 0 rgba(109, 35, 35, 0)',
+                  },
+                },
+              }}
+            >
+              <Payment sx={{ fontSize: 44, color: '#6d2323' }} />
+            </Box>
+          </Box>
+
+          {/* Title and Text */}
+          <Typography
+            variant="h6"
+            sx={{
+              color: '#6d2323',
+              mb: 1,
+              fontWeight: 'bold',
+            }}
+          >
+            Confirm Submission
+          </Typography>
+
+          <Typography
+            variant="body2"
+            sx={{
+              color: 'black',
+              mb: 3,
+              px: 2,
+              pb: 1,
+            }}
+          >
+            Please ensure that all payroll information has been reviewed and
+            verified. Do you wish to proceed with the submission?
+          </Typography>
+
+          {/* Buttons */}
+          <Box display="flex" justifyContent="center" gap={2}>
+            <Button
+              variant="outlined"
+              onClick={() => setShowConfirmation(false)}
+              disabled={isSubmitting}
+              sx={{
+                color: '#6d2323',
+                borderColor: '#6d2323',
+                '&:hover': {
+                  borderColor: '#6d2323',
+                  backgroundColor: '#6d232310',
+                },
+                px: 3,
+              }}
+            >
+              CANCEL
+            </Button>
+            <Button
+              variant="contained"
+              disabled={isSubmitting}
+              onClick={async () => {
+                setIsSubmitting(true);
+                setShowConfirmation(false);
+                setLoading(true);
+
+                try {
+                  await handleSubmitPayroll();
+                  setTimeout(() => {
+                    setLoading(false);
+                    setSuccessAction('export');
+                    setSuccessOpen(true);
+                    setTimeout(() => {
+                      setSuccessOpen(false);
+                      window.location.href = '/payroll-processed';
+                    }, 2500);
+                  }, 2500);
+                } catch (error) {
+                  console.error('Error exporting payroll:', error);
+                  setLoading(false);
+                  alert('Failed to export payroll records. Please try again.');
+                } finally {
+                  setIsSubmitting(false);
+                }
+              }}
+              sx={{
+                backgroundColor: '#6d2323',
+                width: 120,
+                '&:hover': { backgroundColor: '#5b1d1d' },
+              }}
+            >
+              YES
+            </Button>
+          </Box>
+        </Box>
+      </Modal>
+
       {/* Loading and Success Overlays */}
       <LoadingOverlay open={loading} message="Processing..." />
       <SuccessfulOverlay
@@ -4081,5 +4048,3 @@ const PayrollProcess = () => {
 };
 
 export default PayrollProcess;
-
-

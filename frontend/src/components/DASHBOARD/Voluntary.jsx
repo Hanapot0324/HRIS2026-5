@@ -1240,13 +1240,13 @@ const VoluntaryWork = () => {
                           <Card
                             onClick={() => handleOpenModal(voluntary)}
                             sx={{
-                              cursor: 'pointer',
-                              border: '1px solid #ddd',
-                              height: '100%',
+                              cursor: "pointer",
+                              border: "1px solid #e0e0e0",
+                              height: "100%",
                               display: 'flex',
                               flexDirection: 'column',
-                              '&:hover': {
-                                borderColor: '#6d2323',
+                              "&:hover": {
+                                borderColor: "#6d2323",
                                 transform: 'translateY(-2px)',
                                 transition: 'all 0.2s ease',
                                 boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
@@ -1278,7 +1278,7 @@ const VoluntaryWork = () => {
                                 <Typography
                                   variant="caption"
                                   sx={{
-                                    color: '#6d2323',
+                                    color: '#666',
                                     px: 0.5,
                                     py: 0.2,
                                     borderRadius: 0.5,
@@ -1286,7 +1286,7 @@ const VoluntaryWork = () => {
                                     fontWeight: 'bold',
                                   }}
                                 >
-                                  {voluntary.person_id}
+                                  ID: {voluntary.person_id}
                                 </Typography>
                               </Box>
 
@@ -1313,17 +1313,28 @@ const VoluntaryWork = () => {
                               </Typography>
 
                               {voluntary.numberOfHours && (
-                                <Chip
-                                  label={`${voluntary.numberOfHours} hours`}
-                                  size="small"
+                                <Box
                                   sx={{
-                                    backgroundColor: '#6d2323',
-                                    color: '#fff',
-                                    fontWeight: 'bold',
-                                    fontSize: '0.7rem',
-                                    alignSelf: 'flex-start',
+                                    display: 'inline-block',
+                                    px: 1,
+                                    py: 0.3,
+                                    borderRadius: 0.5,
+                                    backgroundColor: '#f5f5f5',
+                                    border: '1px solid #ddd',
+                                    alignSelf: 'flex-start'
                                   }}
-                                />
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{
+                                      color: '#666',
+                                      fontSize: '0.7rem',
+                                      fontWeight: 'bold',
+                                    }}
+                                  >
+                                    {voluntary.numberOfHours} hours
+                                  </Typography>
+                                </Box>
                               )}
                             </CardContent>
                           </Card>
@@ -1336,18 +1347,21 @@ const VoluntaryWork = () => {
                         key={voluntary.id}
                         onClick={() => handleOpenModal(voluntary)}
                         sx={{
-                          cursor: 'pointer',
-                          border: '1px solid #ddd',
+                          cursor: "pointer",
+                          border: "1px solid #e0e0e0",
                           mb: 1,
-                          '&:hover': {
-                            borderColor: '#6d2323',
+                          "&:hover": {
+                            borderColor: "#6d2323",
                             backgroundColor: '#fafafa',
                           },
                         }}
                       >
                         <Box sx={{ p: 1.5 }}>
                           <Box
-                            sx={{ display: 'flex', alignItems: 'flex-start' }}
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                            }}
                           >
                             <Box sx={{ mr: 1.5, mt: 0.2 }}>
                               <VolunteerActivismIcon
@@ -1366,17 +1380,13 @@ const VoluntaryWork = () => {
                                 <Typography
                                   variant="caption"
                                   sx={{
-                                    backgroundColor: '#6d2323',
-                                    color: 'white',
-                                    px: 0.5,
-                                    py: 0.2,
-                                    borderRadius: 0.5,
+                                    color: '#666',
                                     fontSize: '0.7rem',
                                     fontWeight: 'bold',
                                     mr: 1,
                                   }}
                                 >
-                                  {voluntary.person_id}
+                                  ID: {voluntary.person_id}
                                 </Typography>
                                 <Typography
                                   variant="body2"
@@ -1397,9 +1407,27 @@ const VoluntaryWork = () => {
                               </Typography>
 
                               {voluntary.numberOfHours && (
-                                <Typography variant="caption" color="#666">
-                                  Hours: {voluntary.numberOfHours}
-                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'inline-block',
+                                    px: 1,
+                                    py: 0.3,
+                                    borderRadius: 0.5,
+                                    backgroundColor: '#f5f5f5',
+                                    border: '1px solid #ddd',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{
+                                      color: '#666',
+                                      fontSize: '0.7rem',
+                                      fontWeight: 'bold',
+                                    }}
+                                  >
+                                    Hours: {voluntary.numberOfHours}
+                                  </Typography>
+                                </Box>
                               )}
                             </Box>
                           </Box>
@@ -1417,7 +1445,11 @@ const VoluntaryWork = () => {
                       >
                         No Records Found
                       </Typography>
-                      <Typography variant="body2" color="#666" sx={{ mt: 0.5 }}>
+                      <Typography
+                        variant="body2"
+                        color="#666"
+                        sx={{ mt: 0.5 }}
+                      >
                         Try adjusting your search criteria
                       </Typography>
                     </Box>
@@ -1433,50 +1465,74 @@ const VoluntaryWork = () => {
         open={!!editVoluntary}
         onClose={handleCloseModal}
         sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
       >
         <Paper
           sx={{
-            width: '90%',
-            maxWidth: '600px',
-            maxHeight: '90vh',
-            overflowY: 'auto',
+            width: "90%",
+            maxWidth: "600px",
+            maxHeight: "90vh",
+            display: "flex",
+            flexDirection: "column",
             borderRadius: 2,
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)',
+            overflow: 'hidden',
           }}
         >
           {editVoluntary && (
             <>
+              {/* Modal Header */}
               <Box
                 sx={{
-                  backgroundColor: '#6D2323',
-                  color: '#ffffff',
+                  backgroundColor: "#6D2323",
+                  color: "#ffffff",
                   p: 2,
-                  borderRadius: '8px 8px 0 0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
                 }}
               >
                 <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
                   {isEditing
-                    ? 'Edit Voluntary Work Information'
-                    : 'Voluntary Work Details'}
+                    ? "Edit Voluntary Work Information"
+                    : "Voluntary Work Details"}
                 </Typography>
-                <IconButton onClick={handleCloseModal} sx={{ color: '#fff' }}>
+                <IconButton onClick={handleCloseModal} sx={{ color: "#fff" }}>
                   <Close />
                 </IconButton>
               </Box>
 
-              <Box sx={{ p: 3 }}>
+              {/* Modal Content with Scroll */}
+              <Box
+                sx={{
+                  p: 3,
+                  flexGrow: 1,
+                  overflowY: 'auto',
+                  maxHeight: 'calc(90vh - 140px)', // Account for header and sticky footer
+                  '&::-webkit-scrollbar': {
+                    width: '6px',
+                  },
+                  '&::-webkit-scrollbar-track': {
+                    background: '#f1f1f1',
+                    borderRadius: '3px',
+                  },
+                  '&::-webkit-scrollbar-thumb': {
+                    background: '#6D2323',
+                    borderRadius: '3px',
+                  },
+                }}
+              >
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
                     <Typography
                       variant="subtitle2"
-                      sx={{ fontWeight: 'bold', mb: 1.5, color: '#6D2323' }}
+                      sx={{ fontWeight: "bold", mb: 1.5, color: "#6D2323" }}
                     >
                       Employee Information
                     </Typography>
@@ -1485,9 +1541,9 @@ const VoluntaryWork = () => {
                         <Typography
                           variant="caption"
                           sx={{
-                            fontWeight: 'bold',
+                            fontWeight: "bold",
                             mb: 0.5,
-                            color: '#333',
+                            color: "#333",
                             display: 'block',
                           }}
                         >
@@ -1526,9 +1582,9 @@ const VoluntaryWork = () => {
                         <Typography
                           variant="caption"
                           sx={{
-                            fontWeight: 'bold',
+                            fontWeight: "bold",
                             mb: 0.5,
-                            color: '#333',
+                            color: "#333",
                             display: 'block',
                           }}
                         >
@@ -1634,9 +1690,9 @@ const VoluntaryWork = () => {
                     <Typography
                       variant="caption"
                       sx={{
-                        fontWeight: 'bold',
+                        fontWeight: "bold",
                         mb: 0.5,
-                        color: '#333',
+                        color: "#333",
                         display: 'block',
                       }}
                     >
@@ -1653,13 +1709,13 @@ const VoluntaryWork = () => {
                         sx={{
                           '& .MuiOutlinedInput-root': {
                             '& fieldset': {
-                              borderColor: '#6D2323',
+                              borderColor: "#6D2323",
                             },
                             '&:hover fieldset': {
-                              borderColor: '#6D2323',
+                              borderColor: "#6D2323",
                             },
                             '&.Mui-focused fieldset': {
-                              borderColor: '#6D2323',
+                              borderColor: "#6D2323",
                             },
                           },
                         }}
@@ -1678,9 +1734,9 @@ const VoluntaryWork = () => {
                     <Typography
                       variant="caption"
                       sx={{
-                        fontWeight: 'bold',
+                        fontWeight: "bold",
                         mb: 0.5,
-                        color: '#333',
+                        color: "#333",
                         display: 'block',
                       }}
                     >
@@ -1698,13 +1754,13 @@ const VoluntaryWork = () => {
                         sx={{
                           '& .MuiOutlinedInput-root': {
                             '& fieldset': {
-                              borderColor: '#6D2323',
+                              borderColor: "#6D2323",
                             },
                             '&:hover fieldset': {
-                              borderColor: '#6D2323',
+                              borderColor: "#6D2323",
                             },
                             '&.Mui-focused fieldset': {
-                              borderColor: '#6D2323',
+                              borderColor: "#6D2323",
                             },
                           },
                         }}
@@ -1723,9 +1779,9 @@ const VoluntaryWork = () => {
                     <Typography
                       variant="caption"
                       sx={{
-                        fontWeight: 'bold',
+                        fontWeight: "bold",
                         mb: 0.5,
-                        color: '#333',
+                        color: "#333",
                         display: 'block',
                       }}
                     >
@@ -1743,13 +1799,13 @@ const VoluntaryWork = () => {
                         sx={{
                           '& .MuiOutlinedInput-root': {
                             '& fieldset': {
-                              borderColor: '#6D2323',
+                              borderColor: "#6D2323",
                             },
                             '&:hover fieldset': {
-                              borderColor: '#6D2323',
+                              borderColor: "#6D2323",
                             },
                             '&.Mui-focused fieldset': {
-                              borderColor: '#6D2323',
+                              borderColor: "#6D2323",
                             },
                           },
                         }}
@@ -1768,9 +1824,9 @@ const VoluntaryWork = () => {
                     <Typography
                       variant="caption"
                       sx={{
-                        fontWeight: 'bold',
+                        fontWeight: "bold",
                         mb: 0.5,
-                        color: '#333',
+                        color: "#333",
                         display: 'block',
                       }}
                     >
@@ -1787,13 +1843,13 @@ const VoluntaryWork = () => {
                         sx={{
                           '& .MuiOutlinedInput-root': {
                             '& fieldset': {
-                              borderColor: '#6D2323',
+                              borderColor: "#6D2323",
                             },
                             '&:hover fieldset': {
-                              borderColor: '#6D2323',
+                              borderColor: "#6D2323",
                             },
                             '&.Mui-focused fieldset': {
-                              borderColor: '#6D2323',
+                              borderColor: "#6D2323",
                             },
                           },
                         }}
@@ -1812,9 +1868,9 @@ const VoluntaryWork = () => {
                     <Typography
                       variant="caption"
                       sx={{
-                        fontWeight: 'bold',
+                        fontWeight: "bold",
                         mb: 0.5,
-                        color: '#333',
+                        color: "#333",
                         display: 'block',
                       }}
                     >
@@ -1831,13 +1887,13 @@ const VoluntaryWork = () => {
                         sx={{
                           '& .MuiOutlinedInput-root': {
                             '& fieldset': {
-                              borderColor: '#6D2323',
+                              borderColor: "#6D2323",
                             },
                             '&:hover fieldset': {
-                              borderColor: '#6D2323',
+                              borderColor: "#6D2323",
                             },
                             '&.Mui-focused fieldset': {
-                              borderColor: '#6D2323',
+                              borderColor: "#6D2323",
                             },
                           },
                         }}
@@ -1853,12 +1909,19 @@ const VoluntaryWork = () => {
                   </Grid>
                 </Grid>
 
+                {/* Sticky Action Buttons */}
                 <Box
                   sx={{
-                    display: 'flex',
+                    backgroundColor: "#ffffff",
+                    borderTop: "1px solid #e0e0e0",
+                    p: 2,
+                    display: "flex",
+                    justifyContent: "flex-end",
                     gap: 2,
-                    mt: 3,
-                    justifyContent: 'flex-end',
+                    position: 'sticky',
+                    bottom: 0,
+                    zIndex: 10,
+                    boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
                   }}
                 >
                   {!isEditing ? (
@@ -1868,11 +1931,11 @@ const VoluntaryWork = () => {
                         variant="outlined"
                         startIcon={<DeleteIcon />}
                         sx={{
-                          color: '#d32f2f',
-                          borderColor: '#d32f2f',
-                          '&:hover': {
-                            backgroundColor: '#d32f2f',
-                            color: '#fff',
+                          color: "#d32f2f",
+                          borderColor: "#d32f2f",
+                          "&:hover": {
+                            backgroundColor: "#d32f2f",
+                            color: "#fff",
                           },
                         }}
                       >
@@ -1883,9 +1946,9 @@ const VoluntaryWork = () => {
                         variant="contained"
                         startIcon={<EditIcon />}
                         sx={{
-                          backgroundColor: '#6D2323',
-                          color: '#FEF9E1',
-                          '&:hover': { backgroundColor: '#5a1d1d' },
+                          backgroundColor: "#6D2323",
+                          color: "#FEF9E1",
+                          "&:hover": { backgroundColor: "#5a1d1d" },
                         }}
                       >
                         Edit
@@ -1898,10 +1961,10 @@ const VoluntaryWork = () => {
                         variant="outlined"
                         startIcon={<CancelIcon />}
                         sx={{
-                          color: '#666',
-                          borderColor: '#666',
-                          '&:hover': {
-                            backgroundColor: '#f5f5f5',
+                          color: "#666",
+                          borderColor: "#666",
+                          "&:hover": {
+                            backgroundColor: "#f5f5f5",
                           },
                         }}
                       >
@@ -1913,14 +1976,14 @@ const VoluntaryWork = () => {
                         startIcon={<SaveIcon />}
                         disabled={!hasChanges()}
                         sx={{
-                          backgroundColor: hasChanges() ? '#6D2323' : '#ccc',
-                          color: '#FEF9E1',
-                          '&:hover': {
-                            backgroundColor: hasChanges() ? '#5a1d1d' : '#ccc',
+                          backgroundColor: hasChanges() ? "#6D2323" : "#ccc",
+                          color: "#FEF9E1",
+                          "&:hover": {
+                            backgroundColor: hasChanges() ? "#5a1d1d" : "#ccc",
                           },
-                          '&:disabled': {
-                            backgroundColor: '#ccc',
-                            color: '#999',
+                          "&:disabled": {
+                            backgroundColor: "#ccc",
+                            color: "#999",
                           },
                         }}
                       >

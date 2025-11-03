@@ -22,8 +22,8 @@ import {
   ListItemText,
   ListItemIcon,
   Card,
-  CardContent
-} from "@mui/material";
+  CardContent,
+} from '@mui/material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
@@ -38,13 +38,13 @@ import {
   Person as PersonIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
-} from "@mui/icons-material";
+} from '@mui/icons-material';
 
 import ReorderIcon from '@mui/icons-material/Reorder';
 import LoadingOverlay from '../LoadingOverlay';
 import SuccessfullOverlay from '../SuccessfulOverlay';
 import AccessDenied from '../AccessDenied';
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from 'react-router-dom';
 
 // Auth header helper
 const getAuthHeaders = () => {
@@ -239,10 +239,9 @@ const EmployeeAutocomplete = ({
         }}
         sx={{
           '& .MuiOutlinedInput-root': {
-            height: '40px',
             '& fieldset': {
               borderColor: error ? 'red' : '#6D2323',
-              borderWidth: '1.5px'
+              borderWidth: '1.5px',
             },
             '&:hover fieldset': {
               borderColor: error ? 'red' : '#6D2323',
@@ -333,13 +332,13 @@ const OtherInformation = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
-  const [successAction, setSuccessAction] = useState("");
+  const [successAction, setSuccessAction] = useState('');
   const [errors, setErrors] = useState({});
   const [viewMode, setViewMode] = useState('grid');
-  
+
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [selectedEditEmployee, setSelectedEditEmployee] = useState(null);
-  
+
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -352,7 +351,7 @@ const OtherInformation = () => {
 
   const [hasAccess, setHasAccess] = useState(null);
   const navigate = useNavigate();
-  
+
   useEffect(() => {
     const userId = localStorage.getItem('employeeNumber');
     const pageId = 11;
@@ -363,13 +362,14 @@ const OtherInformation = () => {
     const checkAccess = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/page_access/${userId}`, {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
         });
         if (response.ok) {
           const accessData = await response.json();
-          const hasPageAccess = accessData.some(access => 
-            access.page_id === pageId && String(access.page_privilege) === '1'
+          const hasPageAccess = accessData.some(
+            (access) =>
+              access.page_id === pageId && String(access.page_privilege) === '1'
           );
           setHasAccess(hasPageAccess);
         } else {
@@ -391,11 +391,13 @@ const OtherInformation = () => {
     try {
       const res = await axios.get(`${API_BASE_URL}/OtherInfo/other-information`);
       setData(res.data);
-      
+
       // Fetch employee names for all records
-      const uniqueEmployeeIds = [...new Set(res.data.map(c => c.person_id).filter(Boolean))];
+      const uniqueEmployeeIds = [
+        ...new Set(res.data.map((c) => c.person_id).filter(Boolean)),
+      ];
       const namesMap = {};
-      
+
       await Promise.all(
         uniqueEmployeeIds.map(async (id) => {
           try {
@@ -409,24 +411,27 @@ const OtherInformation = () => {
           }
         })
       );
-      
+
       setEmployeeNames(namesMap);
     } catch (err) {
       console.error('Error fetching data:', err);
-      showSnackbar('Failed to fetch other information records. Please try again.', 'error');
+      showSnackbar(
+        'Failed to fetch other information records. Please try again.',
+        'error'
+      );
     }
   };
 
   const validateForm = () => {
     const newErrors = {};
     const requiredFields = ['person_id'];
-    
-    requiredFields.forEach(field => {
+
+    requiredFields.forEach((field) => {
       if (!newInformation[field] || newInformation[field].trim() === '') {
         newErrors[field] = 'This field is required';
       }
     });
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -436,7 +441,7 @@ const OtherInformation = () => {
       showSnackbar('Please fill in all required fields', 'error');
       return;
     }
-    
+
     setLoading(true);
     try {
       await axios.post(`${API_BASE_URL}/OtherInfo/other-information`, newInformation);
@@ -448,34 +453,43 @@ const OtherInformation = () => {
       });
       setSelectedEmployee(null);
       setErrors({});
-      setTimeout(() => {     
-        setLoading(false);  
-        setSuccessAction("adding");
+      setTimeout(() => {
+        setLoading(false);
+        setSuccessAction('adding');
         setSuccessOpen(true);
         setTimeout(() => setSuccessOpen(false), 2000);
-      }, 300);  
+      }, 300);
       fetchInformation();
     } catch (err) {
       console.error('Error adding data:', err);
       setLoading(false);
-      showSnackbar('Failed to add other information record. Please try again.', 'error');
+      showSnackbar(
+        'Failed to add other information record. Please try again.',
+        'error'
+      );
     }
   };
 
   const handleUpdate = async () => {
     try {
-      await axios.put(`${API_BASE_URL}/OtherInfo/other-information/${editInformation.id}`, editInformation);
+      await axios.put(
+        `${API_BASE_URL}/OtherInfo/other-information/${editInformation.id}`,
+        editInformation
+      );
       setEditInformation(null);
       setOriginalInformation(null);
       setSelectedEditEmployee(null);
       setIsEditing(false);
       fetchInformation();
-      setSuccessAction("edit");
+      setSuccessAction('edit');
       setSuccessOpen(true);
       setTimeout(() => setSuccessOpen(false), 2000);
     } catch (err) {
       console.error('Error updating data:', err);
-      showSnackbar('Failed to update other information record. Please try again.', 'error');
+      showSnackbar(
+        'Failed to update other information record. Please try again.',
+        'error'
+      );
     }
   };
 
@@ -487,12 +501,15 @@ const OtherInformation = () => {
       setSelectedEditEmployee(null);
       setIsEditing(false);
       fetchInformation();
-      setSuccessAction("delete");
+      setSuccessAction('delete');
       setSuccessOpen(true);
       setTimeout(() => setSuccessOpen(false), 2000);
     } catch (err) {
       console.error('Error deleting data:', err);
-      showSnackbar('Failed to delete other information record. Please try again.', 'error');
+      showSnackbar(
+        'Failed to delete other information record. Please try again.',
+        'error'
+      );
     }
   };
 
@@ -502,7 +519,7 @@ const OtherInformation = () => {
     } else {
       setNewInformation({ ...newInformation, [field]: value });
       if (errors[field]) {
-        setErrors(prev => {
+        setErrors((prev) => {
           const newErrors = { ...prev };
           delete newErrors[field];
           return newErrors;
@@ -513,7 +530,7 @@ const OtherInformation = () => {
 
   const handleEmployeeChange = (employeeNumber) => {
     setNewInformation({ ...newInformation, person_id: employeeNumber });
-    setErrors(prev => {
+    setErrors((prev) => {
       const newErrors = { ...prev };
       delete newErrors.person_id;
       return newErrors;
@@ -534,7 +551,7 @@ const OtherInformation = () => {
 
   const handleOpenModal = async (information) => {
     const employeeName = employeeNames[information.person_id] || 'Unknown';
-    
+
     setEditInformation({ ...information });
     setOriginalInformation({ ...information });
     setSelectedEditEmployee({
@@ -572,7 +589,7 @@ const OtherInformation = () => {
 
   const hasChanges = () => {
     if (!editInformation || !originalInformation) return false;
-    
+
     return (
       editInformation.specialSkills !== originalInformation.specialSkills ||
       editInformation.nonAcademicDistinctions !== originalInformation.nonAcademicDistinctions ||
@@ -584,19 +601,25 @@ const OtherInformation = () => {
   if (hasAccess === null) {
     return (
       <Container maxWidth="md" sx={{ py: 8 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <CircularProgress sx={{ color: "#6d2323", mb: 2 }} />
-          <Typography variant="h6" sx={{ color: "#6d2323" }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+          }}
+        >
+          <CircularProgress sx={{ color: '#6d2323', mb: 2 }} />
+          <Typography variant="h6" sx={{ color: '#6d2323' }}>
             Loading access information...
           </Typography>
         </Box>
       </Container>
     );
   }
-  
+
   if (!hasAccess) {
     return (
-      <AccessDenied 
+      <AccessDenied
         title="Access Denied"
         message="You do not have permission to access Other Information. Contact your administrator to request access."
         returnPath="/admin-home"
@@ -606,37 +629,55 @@ const OtherInformation = () => {
   }
 
   const filteredData = data.filter((information) => {
-    const specialSkills = information.specialSkills?.toLowerCase() || "";
+    const specialSkills = information.specialSkills?.toLowerCase() || '';
     const personId = information.person_id?.toString() || "";
-    const employeeName = employeeNames[information.person_id]?.toLowerCase() || "";
+    const employeeName =
+      employeeNames[information.person_id]?.toLowerCase() || "";
     const search = searchTerm.toLowerCase();
-    return personId.includes(search) || specialSkills.includes(search) || employeeName.includes(search);
+    return (
+      personId.includes(search) ||
+      specialSkills.includes(search) ||
+      employeeName.includes(search)
+    );
   });
 
   return (
-    <Box sx={{ 
-      minHeight: '100vh', 
-      display: 'flex', 
-      flexDirection: 'column',
-      pt: 2,
-      mt: -5
-    }}>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        pt: 2,
+        mt: -5,
+      }}
+    >
       <LoadingOverlay open={loading} message="Adding other information record..." />
       <SuccessfullOverlay open={successOpen} action={successAction} />
-      
+
       <Box sx={{ textAlign: 'center', mb: 3, px: 2 }}>
-        <Typography variant="h4" sx={{ color: "#6D2323", fontWeight: 'bold', mb: 0.5 }}>
+        <Typography
+          variant="h4"
+          sx={{ color: '#6D2323', fontWeight: 'bold', mb: 0.5 }}
+        >
           Other Information Management
         </Typography>
-        <Typography variant="body2" sx={{ color: "#666" }}>
+        <Typography variant="body2" sx={{ color: '#666' }}>
           Add and manage other information for employees
         </Typography>
       </Box>
 
-      <Container maxWidth="xl" sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+      <Container
+        maxWidth="xl"
+        sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}
+      >
         <Grid container spacing={3} sx={{ flexGrow: 1 }}>
-          <Grid item xs={12} lg={6} sx={{ display: 'flex', flexDirection: 'column' }}>
-            <Paper 
+          <Grid
+            item
+            xs={12}
+            lg={6}
+            sx={{ display: 'flex', flexDirection: 'column' }}
+          >
+            <Paper
               elevation={4}
               sx={{
                 display: 'flex',
@@ -646,20 +687,20 @@ const OtherInformation = () => {
                 boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                 border: '1px solid rgba(109, 35, 35, 0.1)',
                 height: { xs: 'auto', lg: 'calc(100vh - 200px)' },
-                maxHeight: { xs: 'none', lg: 'calc(100vh - 200px)' }
+                maxHeight: { xs: 'none', lg: 'calc(100vh - 200px)' },
               }}
             >
               <Box
                 sx={{
-                  backgroundColor: "#6D2323",
-                  color: "#ffffff",
+                  backgroundColor: '#6D2323',
+                  color: '#ffffff',
                   p: 2,
-                  display: "flex",
-                  alignItems: "center",
+                  display: 'flex',
+                  alignItems: 'center',
                   boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
                 }}
               >
-                <InfoIcon sx={{ fontSize: "1.8rem", mr: 2 }} />
+                <InfoIcon sx={{ fontSize: '1.8rem', mr: 2 }} />
                 <Box>
                   <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
                     Add Other Information
@@ -670,21 +711,35 @@ const OtherInformation = () => {
                 </Box>
               </Box>
 
-              <Box sx={{ 
-                p: 3, 
-                flexGrow: 1, 
-                display: 'flex', 
-                flexDirection: 'column',
-                overflowY: 'auto'
-              }}>
+              <Box
+                sx={{
+                  p: 3,
+                  flexGrow: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflowY: 'auto',
+                }}
+              >
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: "bold", mb: 1.5, color: "#6D2323" }}>
-                      Employee Information <span style={{ color: 'red' }}>*</span>
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ fontWeight: 'bold', mb: 1.5, color: '#6D2323' }}
+                    >
+                      Employee Information{' '}
+                      <span style={{ color: 'red' }}>*</span>
                     </Typography>
                     <Grid container spacing={2}>
                       <Grid item xs={12} sm={6}>
-                        <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontWeight: 'bold',
+                            mb: 0.5,
+                            color: '#333',
+                            display: 'block',
+                          }}
+                        >
                           Search Employee
                         </Typography>
                         <EmployeeAutocomplete
@@ -700,7 +755,15 @@ const OtherInformation = () => {
                       </Grid>
 
                       <Grid item xs={12} sm={6}>
-                        <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontWeight: 'bold',
+                            mb: 0.5,
+                            color: '#333',
+                            display: 'block',
+                          }}
+                        >
                           Selected Employee
                         </Typography>
                         {selectedEmployee ? (
@@ -713,11 +776,19 @@ const OtherInformation = () => {
                               borderRadius: '4px',
                               padding: '8px 12px',
                               gap: 1.5,
-                              height: '21px'
+                              minHeight: '40px',
                             }}
                           >
-                            <PersonIcon sx={{ color: '#6D2323', fontSize: '20px' }} />
-                            <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                            <PersonIcon
+                              sx={{ color: '#6D2323', fontSize: '20px' }}
+                            />
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                flex: 1,
+                              }}
+                            >
                               <Typography
                                 variant="body2"
                                 sx={{
@@ -751,7 +822,7 @@ const OtherInformation = () => {
                               border: '2px dashed #ccc',
                               borderRadius: '8px',
                               padding: '8px 12px',
-                              height: '21px',
+                              minHeight: '40px',
                             }}
                           >
                             <Typography
@@ -771,104 +842,136 @@ const OtherInformation = () => {
                   </Grid>
 
                   <Grid item xs={12}>
-                    <Box sx={{ 
-                      borderBottom: '2px solid #e0e0e0', 
-                      my: 2,
-                      '&::before': {
-                        content: '"Information Details"',
-                        position: 'absolute',
-                        left: 20,
-                        top: -10,
-                        backgroundColor: '#fff',
-                        px: 1,
-                        color: '#6D2323',
-                        fontWeight: 'bold',
-                        fontSize: '0.875rem'
-                      },
-                      position: 'relative'
-                    }} />
+                    <Box
+                      sx={{
+                        borderBottom: '2px solid #e0e0e0',
+                        my: 2,
+                        '&::before': {
+                          content: '"Information Details"',
+                          position: 'absolute',
+                          left: 20,
+                          top: -10,
+                          backgroundColor: '#fff',
+                          px: 1,
+                          color: '#6D2323',
+                          fontWeight: 'bold',
+                          fontSize: '0.875rem',
+                        },
+                        position: 'relative',
+                      }}
+                    />
                   </Grid>
 
                   <Grid item xs={12}>
-                    <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontWeight: 'bold',
+                        mb: 0.5,
+                        color: '#333',
+                        display: 'block',
+                      }}
+                    >
                       Special Skills
                     </Typography>
                     <TextField
                       value={newInformation.specialSkills}
-                      onChange={(e) => handleChange("specialSkills", e.target.value)}
+                      onChange={(e) =>
+                        handleChange('specialSkills', e.target.value)
+                      }
                       fullWidth
                       size="small"
                       multiline
-                      rows={3}
+                      rows={2}
                       sx={{
                         '& .MuiOutlinedInput-root': {
-                              '& fieldset': {
-                                borderColor: '#6D2323',
-                                borderWidth: '1.5px'
-                              },
-                              '&:hover fieldset': {
-                                borderColor: '#6D2323',
-                              },
-                              '&.Mui-focused fieldset': {
-                                borderColor: '#6D2323',
-                              },
-                            },
+                          '& fieldset': {
+                            borderColor: '#6D2323',
+                            borderWidth: '1.5px',
+                          },
+                          '&:hover fieldset': {
+                            borderColor: '#6D2323',
+                          },
+                          '&.Mui-focused fieldset': {
+                            borderColor: '#6D2323',
+                          },
+                        },
                       }}
                     />
                   </Grid>
 
                   <Grid item xs={12}>
-                    <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontWeight: 'bold',
+                        mb: 0.5,
+                        color: '#333',
+                        display: 'block',
+                      }}
+                    >
                       Non-Academic Distinctions
                     </Typography>
                     <TextField
                       value={newInformation.nonAcademicDistinctions}
-                      onChange={(e) => handleChange("nonAcademicDistinctions", e.target.value)}
+                      onChange={(e) =>
+                        handleChange('nonAcademicDistinctions', e.target.value)
+                      }
                       fullWidth
                       size="small"
                       multiline
-                      rows={3}
+                      rows={2}
                       sx={{
                         '& .MuiOutlinedInput-root': {
-                              '& fieldset': {
-                                borderColor: '#6D2323',
-                                borderWidth: '1.5px'
-                              },
-                              '&:hover fieldset': {
-                                borderColor: '#6D2323',
-                              },
-                              '&.Mui-focused fieldset': {
-                                borderColor: '#6D2323',
-                              },
-                            },
+                          '& fieldset': {
+                            borderColor: '#6D2323',
+                            borderWidth: '1.5px',
+                          },
+                          '&:hover fieldset': {
+                            borderColor: '#6D2323',
+                          },
+                          '&.Mui-focused fieldset': {
+                            borderColor: '#6D2323',
+                          },
+                        },
                       }}
                     />
                   </Grid>
 
                   <Grid item xs={12}>
-                    <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontWeight: 'bold',
+                        mb: 0.5,
+                        color: '#333',
+                        display: 'block',
+                      }}
+                    >
                       Membership in Association
                     </Typography>
                     <TextField
                       value={newInformation.membershipInAssociation}
-                      onChange={(e) => handleChange("membershipInAssociation", e.target.value)}
+                      onChange={(e) =>
+                        handleChange('membershipInAssociation', e.target.value)
+                      }
                       fullWidth
                       size="small"
                       multiline
-                      rows={3}
+                      rows={2}
                       sx={{
                         '& .MuiOutlinedInput-root': {
-                              '& fieldset': {
-                                borderColor: '#6D2323',
-                                borderWidth: '1.5px'
-                              },
-                              '&:hover fieldset': {
-                                borderColor: '#6D2323',
-                              },
-                              '&.Mui-focused fieldset': {
-                                borderColor: '#6D2323',
-                              },
-                            },
+                          '& fieldset': {
+                            borderColor: '#6D2323',
+                            borderWidth: '1.5px',
+                          },
+                          '&:hover fieldset': {
+                            borderColor: '#6D2323',
+                          },
+                          '&.Mui-focused fieldset': {
+                            borderColor: '#6D2323',
+                          },
+                        },
                       }}
                     />
                   </Grid>
@@ -881,12 +984,12 @@ const OtherInformation = () => {
                     startIcon={<AddIcon />}
                     fullWidth
                     sx={{
-                      backgroundColor: "#6D2323",
-                      color: "#FEF9E1",
+                      backgroundColor: '#6D2323',
+                      color: '#FEF9E1',
                       py: 1.2,
                       fontWeight: 'bold',
-                      "&:hover": { 
-                        backgroundColor: "#5a1d1d",
+                      '&:hover': {
+                        backgroundColor: '#5a1d1d',
                       },
                     }}
                   >
@@ -897,8 +1000,13 @@ const OtherInformation = () => {
             </Paper>
           </Grid>
 
-          <Grid item xs={12} lg={6} sx={{ display: 'flex', flexDirection: 'column' }}>
-            <Paper 
+          <Grid
+            item
+            xs={12}
+            lg={6}
+            sx={{ display: 'flex', flexDirection: 'column' }}
+          >
+            <Paper
               elevation={4}
               sx={{
                 display: 'flex',
@@ -908,22 +1016,22 @@ const OtherInformation = () => {
                 boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                 border: '1px solid rgba(109, 35, 35, 0.1)',
                 height: { xs: 'auto', lg: 'calc(100vh - 200px)' },
-                maxHeight: { xs: 'none', lg: 'calc(100vh - 200px)' }
+                maxHeight: { xs: 'none', lg: 'calc(100vh - 200px)' },
               }}
             >
               <Box
                 sx={{
-                  backgroundColor: "#6D2323",
-                  color: "#ffffff",
+                  backgroundColor: '#6D2323',
+                  color: '#ffffff',
                   p: 2,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
                   boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
                 }}
               >
-                <Box sx={{ display: "flex", alignItems: "center" }}>
-                  <ReorderIcon sx={{ fontSize: "1.8rem", mr: 2 }} />
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <ReorderIcon sx={{ fontSize: '1.8rem', mr: 2 }} />
                   <Box>
                     <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
                       Other Information Records
@@ -933,7 +1041,7 @@ const OtherInformation = () => {
                     </Typography>
                   </Box>
                 </Box>
-                
+
                 <ToggleButtonGroup
                   value={viewMode}
                   exclusive
@@ -948,9 +1056,9 @@ const OtherInformation = () => {
                       padding: '4px 8px',
                       '&.Mui-selected': {
                         backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                        color: 'white'
+                        color: 'white',
                       },
-                    }
+                    },
                   }}
                 >
                   <ToggleButton value="grid" aria-label="grid view">
@@ -962,13 +1070,15 @@ const OtherInformation = () => {
                 </ToggleButtonGroup>
               </Box>
 
-              <Box sx={{ 
-                p: 3, 
-                flexGrow: 1, 
-                display: 'flex', 
-                flexDirection: 'column',
-                overflow: 'hidden'
-              }}>
+              <Box
+                sx={{
+                  p: 3,
+                  flexGrow: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                }}
+              >
                 <Box sx={{ mb: 2 }}>
                   <TextField
                     size="small"
@@ -978,30 +1088,30 @@ const OtherInformation = () => {
                     onChange={(e) => setSearchTerm(e.target.value)}
                     fullWidth
                     sx={{
-                      "& .MuiOutlinedInput-root": {
-                        "& fieldset": {
-                          borderColor: "#6D2323",
-                          borderWidth: '1.5px'
+                      '& .MuiOutlinedInput-root': {
+                        '& fieldset': {
+                          borderColor: '#6D2323',
+                          borderWidth: '1.5px',
                         },
-                        "&:hover fieldset": {
-                          borderColor: "#6D2323",
+                        '&:hover fieldset': {
+                          borderColor: '#6D2323',
                         },
-                        "&.Mui-focused fieldset": {
-                          borderColor: "#6D2323",
+                        '&.Mui-focused fieldset': {
+                          borderColor: '#6D2323',
                         },
                       },
                     }}
                     InputProps={{
                       startAdornment: (
-                        <SearchIcon sx={{ color: "#6D2323", mr: 1 }} />
+                        <SearchIcon sx={{ color: '#6D2323', mr: 1 }} />
                       ),
                     }}
                   />
                 </Box>
 
-                <Box 
-                  sx={{ 
-                    flexGrow: 1, 
+                <Box
+                  sx={{
+                    flexGrow: 1,
                     overflowY: 'auto',
                     pr: 1,
                     '&::-webkit-scrollbar': {
@@ -1025,53 +1135,103 @@ const OtherInformation = () => {
                             onClick={() => handleOpenModal(information)}
                             sx={{
                               cursor: "pointer",
-                              border: "1px solid #ddd",
+                              border: "1px solid #e0e0e0",
                               height: "100%",
                               display: 'flex',
                               flexDirection: 'column',
-                              "&:hover": { 
+                              "&:hover": {
                                 borderColor: "#6d2323",
                                 transform: 'translateY(-2px)',
                                 transition: 'all 0.2s ease',
-                                boxShadow: '0 4px 8px rgba(0,0,0,0.15)'
+                                boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
                               },
                             }}
                           >
-                            <CardContent sx={{ p: 1.5, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                <InfoIcon sx={{ fontSize: 18, color: '#6d2323', mr: 0.5 }} />
-                                <Typography variant="caption" sx={{ 
-                                  color: '#6d2323', 
-                                  px: 0.5, 
-                                  py: 0.2, 
-                                  borderRadius: 0.5,
-                                  fontSize: '0.7rem',
-                                  fontWeight: 'bold'
-                                }}>
-                                  {information.person_id}
-                                </Typography>
-                              </Box>
-                              
-                              <Typography variant="body2" fontWeight="bold" color="#333" mb={0.5} noWrap>
-                                {employeeNames[information.person_id] || 'Loading...'}
-                              </Typography>
-                              
-                              <Typography variant="body2" fontWeight="bold" color="#333" mb={1} noWrap sx={{ flexGrow: 1 }}>
-                                {information.specialSkills || 'No Skills Listed'}
-                              </Typography>
-                              
-                              {information.nonAcademicDistinctions && (
-                                <Chip
-                                  label="Has Distinctions"
-                                  size="small"
+                            <CardContent
+                              sx={{
+                                p: 1.5,
+                                flexGrow: 1,
+                                display: 'flex',
+                                flexDirection: 'column',
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  mb: 1,
+                                }}
+                              >
+                                <InfoIcon
                                   sx={{
-                                    backgroundColor: "#6d2323",
-                                    color: "#fff",
-                                    fontWeight: "bold",
-                                    fontSize: '0.7rem',
-                                    alignSelf: 'flex-start'
+                                    fontSize: 18,
+                                    color: '#6d2323',
+                                    mr: 0.5,
                                   }}
                                 />
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    color: '#666',
+                                    px: 0.5,
+                                    py: 0.2,
+                                    borderRadius: 0.5,
+                                    fontSize: '0.7rem',
+                                    fontWeight: 'bold',
+                                  }}
+                                >
+                                  ID: {information.person_id}
+                                </Typography>
+                              </Box>
+
+                              <Typography
+                                variant="body2"
+                                fontWeight="bold"
+                                color="#333"
+                                mb={0.5}
+                                noWrap
+                              >
+                                {employeeNames[information.person_id] ||
+                                  'Loading...'}
+                              </Typography>
+
+                              <Typography
+                                variant="body2"
+                                fontWeight="bold"
+                                color="#333"
+                                mb={1}
+                                noWrap
+                                sx={{ flexGrow: 1 }}
+                              >
+                                {information.specialSkills || 'No Skills Listed'}
+                              </Typography>
+
+                              {information.nonAcademicDistinctions &&
+                                information.nonAcademicDistinctions.trim() && (
+                                <Box
+                                  sx={{
+                                    display: 'inline-block',
+                                    px: 1,
+                                    py: 0.3,
+                                    borderRadius: 0.5,
+                                    backgroundColor: '#f5f5f5',
+                                    border: '1px solid #ddd',
+                                    alignSelf: 'flex-start'
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{
+                                      color: '#666',
+                                      fontSize: '0.7rem',
+                                      fontWeight: 'bold',
+                                    }}
+                                  >
+                                    {information.nonAcademicDistinctions.length > 30
+                                      ? `${information.nonAcademicDistinctions.substring(0, 30)}...`
+                                      : information.nonAcademicDistinctions}
+                                  </Typography>
+                                </Box>
                               )}
                             </CardContent>
                           </Card>
@@ -1085,47 +1245,89 @@ const OtherInformation = () => {
                         onClick={() => handleOpenModal(information)}
                         sx={{
                           cursor: "pointer",
-                          border: "1px solid #ddd",
+                          border: "1px solid #e0e0e0",
                           mb: 1,
-                          "&:hover": { 
+                          "&:hover": {
                             borderColor: "#6d2323",
-                            backgroundColor: '#fafafa'
+                            backgroundColor: '#fafafa',
                           },
                         }}
                       >
                         <Box sx={{ p: 1.5 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                            }}
+                          >
                             <Box sx={{ mr: 1.5, mt: 0.2 }}>
-                              <InfoIcon sx={{ fontSize: 20, color: '#6d2323' }} />
+                              <InfoIcon
+                                sx={{ fontSize: 20, color: '#6d2323' }}
+                              />
                             </Box>
-                            
+
                             <Box sx={{ flexGrow: 1 }}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                                <Typography variant="caption" sx={{ 
-                                  backgroundColor: '#6d2323', 
-                                  color: 'white', 
-                                  px: 0.5, 
-                                  py: 0.2, 
-                                  borderRadius: 0.5,
-                                  fontSize: '0.7rem',
-                                  fontWeight: 'bold',
-                                  mr: 1
-                                }}>
-                                  {information.person_id}
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  mb: 0.5,
+                                }}
+                              >
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    color: '#666',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 'bold',
+                                    mr: 1,
+                                  }}
+                                >
+                                  ID: {information.person_id}
                                 </Typography>
-                                <Typography variant="body2" fontWeight="bold" color="#333">
-                                  {employeeNames[information.person_id] || 'Loading...'}
+                                <Typography
+                                  variant="body2"
+                                  fontWeight="bold"
+                                  color="#333"
+                                >
+                                  {employeeNames[information.person_id] ||
+                                    'Loading...'}
                                 </Typography>
                               </Box>
-                              
-                              <Typography variant="body2" color="#666" sx={{ mb: 0.5 }}>
+
+                              <Typography
+                                variant="body2"
+                                color="#666"
+                                sx={{ mb: 0.5 }}
+                              >
                                 {information.specialSkills || 'No Skills Listed'}
                               </Typography>
-                              
-                              {information.nonAcademicDistinctions && (
-                                <Typography variant="caption" color="#666">
-                                  Has non-academic distinctions
-                                </Typography>
+
+                              {information.nonAcademicDistinctions &&
+                                information.nonAcademicDistinctions.trim() && (
+                                <Box
+                                  sx={{
+                                    display: 'inline-block',
+                                    px: 1,
+                                    py: 0.3,
+                                    borderRadius: 0.5,
+                                    backgroundColor: '#f5f5f5',
+                                    border: '1px solid #ddd',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    sx={{
+                                      color: '#666',
+                                      fontSize: '0.7rem',
+                                      fontWeight: 'bold',
+                                    }}
+                                  >
+                                    {information.nonAcademicDistinctions.length > 50
+                                      ? `${information.nonAcademicDistinctions.substring(0, 50)}...`
+                                      : information.nonAcademicDistinctions}
+                                  </Typography>
+                                </Box>
                               )}
                             </Box>
                           </Box>
@@ -1133,13 +1335,21 @@ const OtherInformation = () => {
                       </Card>
                     ))
                   )}
-                  
+
                   {filteredData.length === 0 && (
                     <Box textAlign="center" py={4}>
-                      <Typography variant="body1" color="#555" fontWeight="bold">
+                      <Typography
+                        variant="body1"
+                        color="#555"
+                        fontWeight="bold"
+                      >
                         No Records Found
                       </Typography>
-                      <Typography variant="body2" color="#666" sx={{ mt: 0.5 }}>
+                      <Typography
+                        variant="body2"
+                        color="#666"
+                        sx={{ mt: 0.5 }}
+                      >
                         Try adjusting your search criteria
                       </Typography>
                     </Box>
@@ -1165,48 +1375,89 @@ const OtherInformation = () => {
             width: "90%",
             maxWidth: "600px",
             maxHeight: "90vh",
-            overflowY: 'auto',
+            display: "flex",
+            flexDirection: "column",
             borderRadius: 2,
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)',
+            overflow: 'hidden',
           }}
         >
           {editInformation && (
             <>
+              {/* Modal Header */}
               <Box
                 sx={{
                   backgroundColor: "#6D2323",
                   color: "#ffffff",
                   p: 2,
-                  borderRadius: "8px 8px 0 0",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
                 }}
               >
                 <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                  {isEditing ? "Edit Other Information" : "Other Information Details"}
+                  {isEditing
+                    ? "Edit Other Information"
+                    : "Other Information Details"}
                 </Typography>
                 <IconButton onClick={handleCloseModal} sx={{ color: "#fff" }}>
                   <Close />
                 </IconButton>
               </Box>
 
-              <Box sx={{ p: 3 }}>
+              {/* Modal Content with Scroll */}
+              <Box
+                sx={{
+                  p: 3,
+                  flexGrow: 1,
+                  overflowY: 'auto',
+                  maxHeight: 'calc(90vh - 140px)', // Account for header and sticky footer
+                  '&::-webkit-scrollbar': {
+                    width: '6px',
+                  },
+                  '&::-webkit-scrollbar-track': {
+                    background: '#f1f1f1',
+                    borderRadius: '3px',
+                  },
+                  '&::-webkit-scrollbar-thumb': {
+                    background: '#6D2323',
+                    borderRadius: '3px',
+                  },
+                }}
+              >
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: "bold", mb: 1.5, color: "#6D2323" }}>
+                    <Typography
+                      variant="subtitle2"
+                      sx={{ fontWeight: "bold", mb: 1.5, color: "#6D2323" }}
+                    >
                       Employee Information
                     </Typography>
                     <Grid container spacing={2}>
                       <Grid item xs={12} sm={6}>
-                        <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontWeight: "bold",
+                            mb: 0.5,
+                            color: "#333",
+                            display: 'block',
+                          }}
+                        >
                           Search Employee
                         </Typography>
                         <EmployeeAutocomplete
                           value={editInformation?.person_id || ''}
-                          onChange={isEditing ? handleEditEmployeeChange : () => {}}
+                          onChange={
+                            isEditing ? handleEditEmployeeChange : () => {}
+                          }
                           selectedEmployee={selectedEditEmployee}
-                          onEmployeeSelect={isEditing ? handleEditEmployeeSelect : () => {}}
+                          onEmployeeSelect={
+                            isEditing ? handleEditEmployeeSelect : () => {}
+                          }
                           placeholder="Search and select employee..."
                           required
                           disabled={!isEditing}
@@ -1228,7 +1479,15 @@ const OtherInformation = () => {
                       </Grid>
 
                       <Grid item xs={12} sm={6}>
-                        <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontWeight: "bold",
+                            mb: 0.5,
+                            color: "#333",
+                            display: 'block',
+                          }}
+                        >
                           Selected Employee
                         </Typography>
                         {selectedEditEmployee ? (
@@ -1241,11 +1500,19 @@ const OtherInformation = () => {
                               borderRadius: '8px',
                               padding: '8px 12px',
                               gap: 1.5,
-                              height: '21px',
+                              minHeight: '40px',
                             }}
                           >
-                            <PersonIcon sx={{ color: '#6D2323', fontSize: '20px' }} />
-                            <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                            <PersonIcon
+                              sx={{ color: '#6D2323', fontSize: '20px' }}
+                            />
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                flex: 1,
+                              }}
+                            >
                               <Typography
                                 variant="body2"
                                 sx={{
@@ -1279,7 +1546,7 @@ const OtherInformation = () => {
                               border: '2px dashed #ccc',
                               borderRadius: '8px',
                               padding: '8px 12px',
-                              height: '21px',
+                              minHeight: '40px',
                             }}
                           >
                             <Typography
@@ -1299,36 +1566,48 @@ const OtherInformation = () => {
                   </Grid>
 
                   <Grid item xs={12}>
-                    <Box sx={{ 
-                      borderBottom: '2px solid #e0e0e0', 
-                      my: 2,
-                      '&::before': {
-                        content: '"Information Details"',
-                        position: 'absolute',
-                        left: 20,
-                        top: -10,
-                        backgroundColor: '#fff',
-                        px: 1,
-                        color: '#6D2323',
-                        fontWeight: 'bold',
-                        fontSize: '0.875rem'
-                      },
-                      position: 'relative'
-                    }} />
+                    <Box
+                      sx={{
+                        borderBottom: '2px solid #e0e0e0',
+                        my: 2,
+                        '&::before': {
+                          content: '"Information Details"',
+                          position: 'absolute',
+                          left: 20,
+                          top: -10,
+                          backgroundColor: '#fff',
+                          px: 1,
+                          color: '#6D2323',
+                          fontWeight: 'bold',
+                          fontSize: '0.875rem',
+                        },
+                        position: 'relative',
+                      }}
+                    />
                   </Grid>
 
                   <Grid item xs={12}>
-                    <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontWeight: "bold",
+                        mb: 0.5,
+                        color: "#333",
+                        display: 'block',
+                      }}
+                    >
                       Special Skills
                     </Typography>
                     {isEditing ? (
                       <TextField
                         value={editInformation.specialSkills}
-                        onChange={(e) => handleChange("specialSkills", e.target.value, true)}
+                        onChange={(e) =>
+                          handleChange('specialSkills', e.target.value, true)
+                        }
                         fullWidth
                         size="small"
                         multiline
-                        rows={3}
+                        rows={2}
                         sx={{
                           '& .MuiOutlinedInput-root': {
                             '& fieldset': {
@@ -1344,24 +1623,37 @@ const OtherInformation = () => {
                         }}
                       />
                     ) : (
-                      <Typography variant="body2" sx={{ p: 1, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ p: 1, bgcolor: '#f5f5f5', borderRadius: 1 }}
+                      >
                         {editInformation.specialSkills || 'N/A'}
                       </Typography>
                     )}
                   </Grid>
 
                   <Grid item xs={12}>
-                    <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontWeight: "bold",
+                        mb: 0.5,
+                        color: "#333",
+                        display: 'block',
+                      }}
+                    >
                       Non-Academic Distinctions
                     </Typography>
                     {isEditing ? (
                       <TextField
                         value={editInformation.nonAcademicDistinctions}
-                        onChange={(e) => handleChange("nonAcademicDistinctions", e.target.value, true)}
+                        onChange={(e) =>
+                          handleChange('nonAcademicDistinctions', e.target.value, true)
+                        }
                         fullWidth
                         size="small"
                         multiline
-                        rows={3}
+                        rows={2}
                         sx={{
                           '& .MuiOutlinedInput-root': {
                             '& fieldset': {
@@ -1377,24 +1669,37 @@ const OtherInformation = () => {
                         }}
                       />
                     ) : (
-                      <Typography variant="body2" sx={{ p: 1, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ p: 1, bgcolor: '#f5f5f5', borderRadius: 1 }}
+                      >
                         {editInformation.nonAcademicDistinctions || 'N/A'}
                       </Typography>
                     )}
                   </Grid>
 
                   <Grid item xs={12}>
-                    <Typography variant="caption" sx={{ fontWeight: "bold", mb: 0.5, color: "#333", display: 'block' }}>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontWeight: "bold",
+                        mb: 0.5,
+                        color: "#333",
+                        display: 'block',
+                      }}
+                    >
                       Membership in Association
                     </Typography>
                     {isEditing ? (
                       <TextField
                         value={editInformation.membershipInAssociation}
-                        onChange={(e) => handleChange("membershipInAssociation", e.target.value, true)}
+                        onChange={(e) =>
+                          handleChange('membershipInAssociation', e.target.value, true)
+                        }
                         fullWidth
                         size="small"
                         multiline
-                        rows={3}
+                        rows={2}
                         sx={{
                           '& .MuiOutlinedInput-root': {
                             '& fieldset': {
@@ -1410,14 +1715,31 @@ const OtherInformation = () => {
                         }}
                       />
                     ) : (
-                      <Typography variant="body2" sx={{ p: 1, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ p: 1, bgcolor: '#f5f5f5', borderRadius: 1 }}
+                      >
                         {editInformation.membershipInAssociation || 'N/A'}
                       </Typography>
                     )}
                   </Grid>
                 </Grid>
 
-                <Box sx={{ display: 'flex', gap: 2, mt: 3, justifyContent: 'flex-end' }}>
+                {/* Sticky Action Buttons */}
+                <Box
+                  sx={{
+                    backgroundColor: "#ffffff",
+                    borderTop: "1px solid #e0e0e0",
+                    p: 2,
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: 2,
+                    position: 'sticky',
+                    bottom: 0,
+                    zIndex: 10,
+                    boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
+                  }}
+                >
                   {!isEditing ? (
                     <>
                       <Button
@@ -1429,8 +1751,8 @@ const OtherInformation = () => {
                           borderColor: "#d32f2f",
                           "&:hover": {
                             backgroundColor: "#d32f2f",
-                            color: "#fff"
-                          }
+                            color: "#fff",
+                          },
                         }}
                       >
                         Delete
@@ -1439,10 +1761,10 @@ const OtherInformation = () => {
                         onClick={handleStartEdit}
                         variant="contained"
                         startIcon={<EditIcon />}
-                        sx={{ 
-                          backgroundColor: "#6D2323", 
+                        sx={{
+                          backgroundColor: "#6D2323",
                           color: "#FEF9E1",
-                          "&:hover": { backgroundColor: "#5a1d1d" }
+                          "&:hover": { backgroundColor: "#5a1d1d" },
                         }}
                       >
                         Edit
@@ -1458,8 +1780,8 @@ const OtherInformation = () => {
                           color: "#666",
                           borderColor: "#666",
                           "&:hover": {
-                            backgroundColor: "#f5f5f5"
-                          }
+                            backgroundColor: "#f5f5f5",
+                          },
                         }}
                       >
                         Cancel
@@ -1469,16 +1791,16 @@ const OtherInformation = () => {
                         variant="contained"
                         startIcon={<SaveIcon />}
                         disabled={!hasChanges()}
-                        sx={{ 
-                          backgroundColor: hasChanges() ? "#6D2323" : "#ccc", 
+                        sx={{
+                          backgroundColor: hasChanges() ? "#6D2323" : "#ccc",
                           color: "#FEF9E1",
-                          "&:hover": { 
-                            backgroundColor: hasChanges() ? "#5a1d1d" : "#ccc"
+                          "&:hover": {
+                            backgroundColor: hasChanges() ? "#5a1d1d" : "#ccc",
                           },
                           "&:disabled": {
                             backgroundColor: "#ccc",
-                            color: "#999"
-                          }
+                            color: "#999",
+                          },
                         }}
                       >
                         Save
