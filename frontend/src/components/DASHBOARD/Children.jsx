@@ -55,6 +55,7 @@ import SuccessfullOverlay from '../SuccessfulOverlay';
 import AccessDenied from '../AccessDenied';
 import { useNavigate } from "react-router-dom";
 import { useSystemSettings } from '../../hooks/useSystemSettings';
+import usePageAccess from '../../hooks/usePageAccess';
 import {
   createThemedCard,
   createThemedButton,
@@ -355,7 +356,6 @@ const Children = () => {
     setSnackbar({ open: true, message, severity });
   };
 
-  const [hasAccess, setHasAccess] = useState(null);
   const navigate = useNavigate();
   
   // Create themed styled components using system settings
@@ -374,36 +374,8 @@ const Children = () => {
   const accentDark = settings.secondaryColor || settings.hoverColor || '#8B3333';
   const grayColor = settings.textSecondaryColor || '#6c757d';
   
-  useEffect(() => {
-    const userId = localStorage.getItem('employeeNumber');
-    const pageId = 3;
-    if (!userId) {
-      setHasAccess(false);
-      return;
-    }
-    const checkAccess = async () => {
-      try {
-        const authHeaders = getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/page_access/${userId}`, {
-          method: "GET",
-          ...authHeaders,
-        });
-        if (response.ok) {
-          const accessData = await response.json();
-          const hasPageAccess = accessData.some(access => 
-            access.page_id === pageId && String(access.page_privilege) === '1'
-          );
-          setHasAccess(hasPageAccess);
-        } else {
-          setHasAccess(false);
-        }
-      } catch (error) {
-        console.error('Error checking access:', error);
-        setHasAccess(false);
-      }
-    };
-    checkAccess();
-  }, []);
+  // Dynamic page access control using component identifier
+  const { hasAccess, loading: accessLoading, error: accessError } = usePageAccess('children');
 
   useEffect(() => {
     fetchChildren();
@@ -665,7 +637,7 @@ const Children = () => {
     );
   }
   
-  if (!hasAccess) {
+  if (hasAccess === false) {
     return (
       <AccessDenied 
         title="Access Denied"

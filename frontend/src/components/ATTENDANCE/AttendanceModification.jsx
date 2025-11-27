@@ -55,6 +55,8 @@ import {
   DateRange as DateRangeIcon,
 } from "@mui/icons-material";
 import { useSystemSettings } from "../../hooks/useSystemSettings";
+import usePageAccess from '../../hooks/usePageAccess';
+import AccessDenied from '../AccessDenied';
 
 // Helper function to convert hex to rgb
 const hexToRgb = (hex) => {
@@ -154,6 +156,16 @@ const AttendanceSearch = () => {
   const month = String(today.getMonth() + 1).padStart(2, '0');
   const day = String(today.getDate()).padStart(2, '0');
   const formattedToday = `${year}-${month}-${day}`;
+
+  //ACCESSING
+  // Dynamic page access control using component identifier
+  // The identifier 'search-attendance' should match the component_identifier in the pages table
+  const {
+    hasAccess,
+    loading: accessLoading,
+    error: accessError,
+  } = usePageAccess('search-attendance');
+  // ACCESSING END
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
@@ -256,6 +268,39 @@ const AttendanceSearch = () => {
       fetchRecords(false); // Silent fetch without loading indicator
     }
   }, [startDate, endDate]);
+
+  // ACCESSING 2
+  // Loading state
+  if (accessLoading) {
+    return (
+      <Container maxWidth="md" sx={{ py: 8 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+          }}
+        >
+          <CircularProgress sx={{ color: '#6d2323', mb: 2 }} />
+          <Typography variant="h6" sx={{ color: '#6d2323' }}>
+            Loading access information...
+          </Typography>
+        </Box>
+      </Container>
+    );
+  }
+  // Access denied state - Now using the reusable component
+  if (hasAccess === false) {
+    return (
+      <AccessDenied
+        title="Access Denied"
+        message="You do not have permission to access Attendance Modification. Contact your administrator to request access."
+        returnPath="/admin-home"
+        returnButtonText="Return to Home"
+      />
+    );
+  }
+  //ACCESSING END2
 
   return (
     <Box sx={{ 

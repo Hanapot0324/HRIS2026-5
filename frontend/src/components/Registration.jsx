@@ -2,6 +2,7 @@ import API_BASE_URL from "../apiConfig";
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAuthHeaders } from "../utils/auth";
+import usePageAccess from "../hooks/usePageAccess";
 import {
   Alert,
   TextField,
@@ -85,41 +86,8 @@ const Registration = () => {
     localStorage.setItem("setupCompletedSteps", JSON.stringify(updated));
   };
 
-  // Page access control states
-  const [hasAccess, setHasAccess] = useState(null);
-
-  // Page access control
-  useEffect(() => {
-    const userId = localStorage.getItem("employeeNumber");
-    const pageId = 16;
-    if (!userId) {
-      setHasAccess(false);
-      return;
-    }
-    const checkAccess = async () => {
-      try {
-        const authHeaders = getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/page_access/${userId}`, {
-          method: "GET",
-          ...authHeaders,
-        });
-        if (response.ok) {
-          const accessData = await response.json();
-          const hasPageAccess = accessData.some(
-            (access) =>
-              access.page_id === pageId && String(access.page_privilege) === "1"
-          );
-          setHasAccess(hasPageAccess);
-        } else {
-          setHasAccess(false);
-        }
-      } catch (error) {
-        console.error("Error checking access:", error);
-        setHasAccess(false);
-      }
-    };
-    checkAccess();
-  }, []);
+  // Dynamic page access control using component identifier
+  const { hasAccess, loading: accessLoading, error: accessError } = usePageAccess('registration');
 
   // Check if setup modal should be shown
   useEffect(() => {
@@ -249,7 +217,7 @@ const Registration = () => {
   };
 
   // Loading state
-  if (hasAccess === null) {
+  if (accessLoading) {
     return (
       <Container maxWidth="md" sx={{ py: 8 }}>
         <Box
@@ -279,7 +247,7 @@ const Registration = () => {
   }
 
   // Access denied state
-  if (!hasAccess) {
+  if (hasAccess === false) {
     return (
       <AccessDenied
         title="Access Denied"

@@ -50,6 +50,9 @@ import {
 import LoadingOverlay from '../LoadingOverlay';
 import SuccessfulOverlay from '../SuccessfulOverlay';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
+import usePageAccess from '../../hooks/usePageAccess';
+import AccessDenied from '../AccessDenied';
+import CircularProgress from '@mui/material/CircularProgress';
 
 // Helper function to convert hex to rgb
 const hexToRgb = (hex) => {
@@ -153,6 +156,17 @@ const OfficialTimeForm = () => {
   const blackColor = '#1a1a1a';
   const whiteColor = '#FFFFFF';
   const grayColor = '#6c757d';
+
+  //ACCESSING
+  // Dynamic page access control using component identifier
+  // The identifier 'official-time' should match the component_identifier in the pages table
+  const {
+    hasAccess,
+    loading: accessLoading,
+    error: accessError,
+  } = usePageAccess('official-time');
+  // ACCESSING END
+
   const [employeeID, setemployeeID] = useState('');
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -434,6 +448,39 @@ const OfficialTimeForm = () => {
       setTimeout(() => setSuccessOpen(false), 2000);
     }
   };
+
+  // ACCESSING 2
+  // Loading state
+  if (accessLoading) {
+    return (
+      <Container maxWidth="md" sx={{ py: 8 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+          }}
+        >
+          <CircularProgress sx={{ color: '#6d2323', mb: 2 }} />
+          <Typography variant="h6" sx={{ color: '#6d2323' }}>
+            Loading access information...
+          </Typography>
+        </Box>
+      </Container>
+    );
+  }
+  // Access denied state - Now using the reusable component
+  if (hasAccess === false) {
+    return (
+      <AccessDenied
+        title="Access Denied"
+        message="You do not have permission to access Official Time Form. Contact your administrator to request access."
+        returnPath="/admin-home"
+        returnButtonText="Return to Home"
+      />
+    );
+  }
+  //ACCESSING END2
 
   return (
     <>

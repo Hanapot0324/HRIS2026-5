@@ -40,6 +40,8 @@ import {
   InputLabel,
   Select,
   FormHelperText,
+  Checkbox,
+  FormControlLabel,
 } from '@mui/material';
 import {
   Add,
@@ -73,6 +75,8 @@ import {
 } from '@mui/icons-material';
 import AccessDenied from './AccessDenied';
 import axios from 'axios';
+import { getComponentInfo } from '../utils/componentMapping';
+import usePageAccess from '../hooks/usePageAccess';
 
 // Get auth headers function
 const getAuthHeaders = () => {
@@ -141,6 +145,7 @@ const PagesList = () => {
   const [pageGroups, setPageGroups] = useState([]);
   const [pageName, setPageName] = useState('');
   const [pageUrl, setPageUrl] = useState('');
+  const [componentIdentifier, setComponentIdentifier] = useState('');
   const [loading, setLoading] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [deletePageId, setDeletePageId] = useState(null);
@@ -153,11 +158,9 @@ const PagesList = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [refreshing, setRefreshing] = useState(false);
   const [addDialog, setAddDialog] = useState(false);
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
 
   const navigate = useNavigate();
-
-  // Page access control states
-  const [hasAccess, setHasAccess] = useState(null);
 
   // Use system settings
   const settings = useSystemSettings();
@@ -220,6 +223,22 @@ const PagesList = () => {
     overflow: "hidden",
     boxShadow: `0 4px 24px ${settings?.primaryColor || '#894444'}0F`,
     border: `1px solid ${settings?.primaryColor || '#894444'}14`,
+    maxHeight: '600px',
+    overflowY: 'auto',
+    '&::-webkit-scrollbar': {
+      width: '8px',
+    },
+    '&::-webkit-scrollbar-track': {
+      background: alpha(settings?.accentColor || '#FEF9E1', 0.3),
+      borderRadius: '4px',
+    },
+    '&::-webkit-scrollbar-thumb': {
+      background: alpha(settings?.primaryColor || '#894444', 0.3),
+      borderRadius: '4px',
+      '&:hover': {
+        background: alpha(settings?.primaryColor || '#894444', 0.5),
+      },
+    },
   })), [settings]);
 
   const PremiumTableCell = useMemo(() => styled(TableCell)(({ theme, isHeader = false }) => ({
@@ -251,55 +270,8 @@ const PagesList = () => {
     'staff'
   ];
 
-  // Page access control
-  useEffect(() => {
-    const userId = localStorage.getItem('employeeNumber');
-    const pageId = 1;
-
-    if (!userId) {
-      setHasAccess(false);
-      return;
-    }
-
-    const checkAccess = async () => {
-      try {
-        const token = localStorage.getItem('token');
-
-        if (!token) {
-          setHasAccess(false);
-          return;
-        }
-
-        const response = await fetch(`${API_BASE_URL}/page_access/${userId}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (response.ok) {
-          const accessData = await response.json();
-          const hasPageAccess = accessData.some(
-            (access) =>
-              access.page_id === pageId && String(access.page_privilege) === '1'
-          );
-          setHasAccess(hasPageAccess);
-        } else if (response.status === 401 || response.status === 403) {
-          console.log('Token expired or invalid');
-          localStorage.clear();
-          window.location.href = '/';
-        } else {
-          setHasAccess(false);
-        }
-      } catch (error) {
-        console.error('Error checking access:', error);
-        setHasAccess(false);
-      }
-    };
-
-    checkAccess();
-  }, []);
+  // Dynamic page access control using component identifier
+  const { hasAccess, loading: accessLoading, error: accessError } = usePageAccess('pages-list');
 
   useEffect(() => {
     if (hasAccess) {
@@ -377,6 +349,7 @@ const PagesList = () => {
       page_description: pageDescription.trim(),
       page_url: pageUrl.trim() || null,
       page_group: pageGroups.join(','), // Join array into comma-separated string
+      component_identifier: componentIdentifier.trim() || null,
     };
 
     try {
@@ -395,16 +368,17 @@ const PagesList = () => {
       const responseData = await response.json();
 
       if (response.ok) {
-        setSuccessMessage(
-          currentPageId
-            ? 'Page updated successfully!'
-            : 'Page created successfully!'
-        );
+        const message = currentPageId
+          ? 'Page updated successfully!'
+          : 'Page created successfully!';
+        setSuccessMessage(message);
         await fetchPages();
         if (currentPageId) {
           setEditDialog(false);
         } else {
           setAddDialog(false);
+          // Auto-hide success message after 1.5 seconds for new pages
+          setTimeout(() => setSuccessMessage(''), 1500);
         }
         resetForm();
       } else {
@@ -426,6 +400,7 @@ const PagesList = () => {
     setPageName('');
     setPageDescription('');
     setPageUrl('');
+    setComponentIdentifier('');
     setPageGroups([]);
   };
 
@@ -447,6 +422,7 @@ const PagesList = () => {
     setCurrentPageId(pg.id);
     setPageName(pg.page_name || '');
     setPageDescription(pg.page_description || '');
+    setComponentIdentifier(pg.component_identifier || '');
     setPageUrl(pg.page_url || '');
     // Split comma-separated groups into an array
     const groups = pg.page_group ? pg.page_group.split(',').map(g => g.trim()) : [];
@@ -458,6 +434,7 @@ const PagesList = () => {
 
   const handleDeleteConfirm = (id) => {
     setDeletePageId(id);
+    setDeleteConfirmed(false); // Reset checkbox when opening dialog
     setDeleteDialog(true);
   };
 
@@ -483,6 +460,7 @@ const PagesList = () => {
       setLoading(false);
       setDeleteDialog(false);
       setDeletePageId(null);
+      setDeleteConfirmed(false); // Reset checkbox after deletion
     }
   };
 
@@ -576,7 +554,7 @@ const PagesList = () => {
   );
 
   // Loading state
-  if (hasAccess === null) {
+  if (accessLoading) {
     return (
       <Container maxWidth="md" sx={{ py: 8 }}>
         <Box
@@ -596,7 +574,7 @@ const PagesList = () => {
   }
 
   // Access denied state
-  if (!hasAccess) {
+  if (hasAccess === false) {
     return (
       <AccessDenied
         title="Access Denied"
@@ -991,6 +969,10 @@ const PagesList = () => {
                         URL
                       </PremiumTableCell>
                       <PremiumTableCell isHeader sx={{ color: settings?.textPrimaryColor || '#6D2323' }}>
+                        <Assignment sx={{ mr: 1, verticalAlign: "middle" }} />
+                        Component Identifier
+                      </PremiumTableCell>
+                      <PremiumTableCell isHeader sx={{ color: settings?.textPrimaryColor || '#6D2323' }}>
                         <Group sx={{ mr: 1, verticalAlign: "middle" }} />
                         Access Groups
                       </PremiumTableCell>
@@ -1061,6 +1043,68 @@ const PagesList = () => {
                           </PremiumTableCell>
 
                           <PremiumTableCell>
+                            {pg.component_identifier ? (
+                              <Tooltip
+                                title={
+                                  getComponentInfo(pg.component_identifier) ? (
+                                    <Box>
+                                      <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                        Connected Component:
+                                      </Typography>
+                                      <Typography variant="caption" display="block">
+                                        <strong>Name:</strong> {getComponentInfo(pg.component_identifier).componentName}
+                                      </Typography>
+                                      <Typography variant="caption" display="block">
+                                        <strong>Path:</strong> {getComponentInfo(pg.component_identifier).componentPath}
+                                      </Typography>
+                                      <Typography variant="caption" display="block">
+                                        <strong>Route:</strong> {getComponentInfo(pg.component_identifier).routePath}
+                                      </Typography>
+                                    </Box>
+                                  ) : (
+                                    "No component mapping found"
+                                  )
+                                }
+                                arrow
+                              >
+                                <Chip
+                                  label={pg.component_identifier}
+                                  size="small"
+                                  icon={getComponentInfo(pg.component_identifier) ? <CheckCircle /> : <Warning />}
+                                  sx={{
+                                    bgcolor: getComponentInfo(pg.component_identifier)
+                                      ? alpha(settings?.primaryColor || '#894444', 0.15)
+                                      : alpha('#ff9800', 0.15),
+                                    color: getComponentInfo(pg.component_identifier)
+                                      ? settings?.primaryColor || '#894444'
+                                      : '#ff9800',
+                                    fontWeight: 600,
+                                    fontFamily: "monospace",
+                                    cursor: "help",
+                                    "&:hover": {
+                                      bgcolor: getComponentInfo(pg.component_identifier)
+                                        ? alpha(settings?.primaryColor || '#894444', 0.25)
+                                        : alpha('#ff9800', 0.25),
+                                    },
+                                  }}
+                                />
+                              </Tooltip>
+                            ) : (
+                              <Chip
+                                label="Not Set"
+                                size="small"
+                                icon={<Error />}
+                                sx={{
+                                  bgcolor: alpha('#9e9e9e', 0.15),
+                                  color: '#9e9e9e',
+                                  fontWeight: 600,
+                                  fontStyle: "italic",
+                                }}
+                              />
+                            )}
+                          </PremiumTableCell>
+
+                          <PremiumTableCell>
                             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                               {pg.page_group && pg.page_group.split(",").map((group, index) => (
                                 <Chip
@@ -1114,7 +1158,7 @@ const PagesList = () => {
                     ) : (
                       <TableRow>
                         <TableCell
-                          colSpan={6}
+                          colSpan={7}
                           sx={{ textAlign: "center", py: 8 }}
                         >
                           <Box sx={{ textAlign: "center" }}>
@@ -1245,6 +1289,30 @@ const PagesList = () => {
                     value={pageUrl}
                     onChange={(e) => setPageUrl(e.target.value)}
                     placeholder="e.g., /dashboard, /users"
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <ModernTextField
+                    fullWidth
+                    label="Component Identifier"
+                    value={componentIdentifier}
+                    onChange={(e) => setComponentIdentifier(e.target.value)}
+                    placeholder="e.g., pds1, registration, users-list"
+                    helperText={
+                      componentIdentifier && getComponentInfo(componentIdentifier)
+                        ? `Connected to: ${getComponentInfo(componentIdentifier).componentName}`
+                        : componentIdentifier
+                        ? "No component mapping found for this identifier"
+                        : "Unique identifier for dynamic page access (optional)"
+                    }
+                    InputProps={{
+                      endAdornment: componentIdentifier && getComponentInfo(componentIdentifier) ? (
+                        <CheckCircle sx={{ color: settings?.primaryColor || '#894444', ml: 1 }} />
+                      ) : componentIdentifier ? (
+                        <Warning sx={{ color: '#ff9800', ml: 1 }} />
+                      ) : null,
+                    }}
                   />
                 </Grid>
 
@@ -1425,6 +1493,30 @@ const PagesList = () => {
                 </Grid>
 
                 <Grid item xs={12} md={6}>
+                  <ModernTextField
+                    fullWidth
+                    label="Component Identifier"
+                    value={componentIdentifier}
+                    onChange={(e) => setComponentIdentifier(e.target.value)}
+                    placeholder="e.g., pds1, registration, users-list"
+                    helperText={
+                      componentIdentifier && getComponentInfo(componentIdentifier)
+                        ? `Connected to: ${getComponentInfo(componentIdentifier).componentName}`
+                        : componentIdentifier
+                        ? "No component mapping found for this identifier"
+                        : "Unique identifier for dynamic page access (optional)"
+                    }
+                    InputProps={{
+                      endAdornment: componentIdentifier && getComponentInfo(componentIdentifier) ? (
+                        <CheckCircle sx={{ color: settings?.primaryColor || '#894444', ml: 1 }} />
+                      ) : componentIdentifier ? (
+                        <Warning sx={{ color: '#ff9800', ml: 1 }} />
+                      ) : null,
+                    }}
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={6}>
                   <FormControl fullWidth>
                     <InputLabel
                       sx={{
@@ -1529,11 +1621,17 @@ const PagesList = () => {
         {/* Delete Confirmation Dialog */}
         <Dialog
           open={deleteDialog}
-          onClose={() => setDeleteDialog(false)}
+          onClose={() => {
+            setDeleteDialog(false);
+            setDeleteConfirmed(false);
+          }}
+          maxWidth="sm"
+          fullWidth
           PaperProps={{
             sx: {
               borderRadius: 4,
               bgcolor: settings?.accentColor || '#FEF9E1',
+              overflow: 'hidden',
             },
           }}
         >
@@ -1543,25 +1641,168 @@ const PagesList = () => {
               color: settings?.accentColor || '#FEF9E1',
               display: "flex",
               alignItems: "center",
-              gap: 2,
+              justifyContent: "space-between",
               p: 3,
               fontWeight: 700,
+              position: "relative",
+              overflow: "hidden",
             }}
           >
-            <Warning sx={{ fontSize: 30 }} />
-            Confirm Delete
+            <Box
+              sx={{
+                position: "absolute",
+                top: -20,
+                right: -20,
+                width: 100,
+                height: 100,
+                background: `radial-gradient(circle, ${alpha('#ffffff', 0.1)} 0%, transparent 70%)`,
+              }}
+            />
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, position: "relative", zIndex: 1 }}>
+              <Avatar
+                sx={{
+                  bgcolor: alpha('#ffffff', 0.2),
+                  width: 48,
+                  height: 48,
+                }}
+              >
+                <Warning sx={{ fontSize: 28, color: settings?.accentColor || '#FEF9E1' }} />
+              </Avatar>
+              <Box>
+                <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  Confirm Deletion
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.9, fontSize: "0.85rem" }}>
+                  This action requires confirmation
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton
+              onClick={() => {
+                setDeleteDialog(false);
+                setDeleteConfirmed(false);
+              }}
+              sx={{
+                color: settings?.accentColor || '#FEF9E1',
+                position: "relative",
+                zIndex: 1,
+                "&:hover": {
+                  bgcolor: alpha('#ffffff', 0.1),
+                },
+              }}
+            >
+              <Cancel />
+            </IconButton>
           </DialogTitle>
           <DialogContent sx={{ p: 4 }}>
-            <Typography sx={{ color: settings?.textPrimaryColor || '#6D2323', fontSize: "1.1rem" }}>
-              Are you sure you want to delete this page? This action cannot be
-              undone and will also remove all associated user access
-              permissions.
-            </Typography>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                textAlign: "center",
+                mb: 3,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: "50%",
+                  bgcolor: alpha(settings?.primaryColor || '#894444', 0.1),
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  mb: 3,
+                }}
+              >
+                <Error sx={{ fontSize: 48, color: settings?.primaryColor || '#894444' }} />
+              </Box>
+              <Typography
+                variant="h6"
+                sx={{
+                  color: settings?.textPrimaryColor || '#6D2323',
+                  fontWeight: 600,
+                  mb: 1.5,
+                }}
+              >
+                Are you sure you want to delete this page?
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  color: alpha(settings?.textPrimaryColor || '#6D2323', 0.7),
+                  mb: 3,
+                  lineHeight: 1.6,
+                }}
+              >
+                This action cannot be undone. Deleting this page will permanently remove it
+                from the system and revoke all associated user access permissions.
+              </Typography>
+            </Box>
+            <Box
+              sx={{
+                p: 2.5,
+                borderRadius: 2,
+                bgcolor: alpha(settings?.primaryColor || '#894444', 0.08),
+                border: `2px solid ${alpha(settings?.primaryColor || '#894444', 0.2)}`,
+                transition: "all 0.3s ease",
+                ...(deleteConfirmed && {
+                  bgcolor: alpha(settings?.primaryColor || '#894444', 0.12),
+                  border: `2px solid ${settings?.primaryColor || '#894444'}`,
+                }),
+              }}
+            >
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={deleteConfirmed}
+                    onChange={(e) => setDeleteConfirmed(e.target.checked)}
+                    sx={{
+                      color: settings?.primaryColor || '#894444',
+                      '&.Mui-checked': {
+                        color: settings?.primaryColor || '#894444',
+                      },
+                      '& .MuiSvgIcon-root': {
+                        fontSize: 28,
+                      },
+                    }}
+                  />
+                }
+                label={
+                  <Typography
+                    sx={{
+                      color: settings?.textPrimaryColor || '#6D2323',
+                      fontSize: "1rem",
+                      fontWeight: deleteConfirmed ? 600 : 500,
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    I understand this action cannot be undone
+                  </Typography>
+                }
+                sx={{
+                  m: 0,
+                  alignItems: "center",
+                }}
+              />
+            </Box>
           </DialogContent>
-          <DialogActions sx={{ p: 3, bgcolor: alpha(settings?.accentColor || '#FEF9E1', 0.5) }}>
+          <DialogActions
+            sx={{
+              p: 3,
+              bgcolor: alpha(settings?.accentColor || '#FEF9E1', 0.5),
+              borderTop: `1px solid ${alpha(settings?.primaryColor || '#894444', 0.1)}`,
+              gap: 2,
+            }}
+          >
             <ProfessionalButton
-              onClick={() => setDeleteDialog(false)}
+              onClick={() => {
+                setDeleteDialog(false);
+                setDeleteConfirmed(false);
+              }}
               variant="outlined"
+              fullWidth
               sx={{
                 borderColor: settings?.primaryColor || '#894444',
                 color: settings?.primaryColor || '#894444',
@@ -1576,16 +1817,26 @@ const PagesList = () => {
             <ProfessionalButton
               onClick={handleDelete}
               variant="contained"
-              disabled={loading}
+              fullWidth
+              disabled={loading || !deleteConfirmed}
+              startIcon={loading ? <CircularProgress size={20} sx={{ color: "#ffffff" }} /> : <Delete />}
               sx={{
-                bgcolor: "#000000",
+                bgcolor: deleteConfirmed
+                  ? settings?.primaryColor || '#894444'
+                  : alpha(settings?.primaryColor || '#894444', 0.3),
                 color: "#ffffff",
                 "&:hover": {
-                  bgcolor: "#333333",
+                  bgcolor: deleteConfirmed
+                    ? settings?.secondaryColor || '#6d2323'
+                    : alpha(settings?.primaryColor || '#894444', 0.3),
+                },
+                "&:disabled": {
+                  bgcolor: alpha(settings?.primaryColor || '#894444', 0.2),
+                  color: alpha("#ffffff", 0.5),
                 },
               }}
             >
-              {loading ? "Deleting..." : "Delete"}
+              {loading ? "Deleting..." : "Delete Page"}
             </ProfessionalButton>
           </DialogActions>
         </Dialog>

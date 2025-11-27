@@ -51,6 +51,7 @@ const eventsRoutes = require('./routes/events');
 const notificationsRoutes = require('./routes/notifications');
 const reportsRoutes = require('./routes/reports');
 const settingsExtendedRoutes = require('./routes/settings-extended');
+const confidentialPasswordRoutes = require('./routes/confidential-password');
 
 const app = express();
 
@@ -154,6 +155,7 @@ app.use('/', eventsRoutes);
 app.use('/', notificationsRoutes);
 app.use('/', reportsRoutes);
 app.use('/', settingsExtendedRoutes);
+app.use('/', confidentialPasswordRoutes);
 
 // ============================================
 // ROUTE ORGANIZATION STATUS

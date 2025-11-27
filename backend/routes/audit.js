@@ -22,6 +22,37 @@ router.get('/audit-logs', authenticateToken, (req, res) => {
   });
 });
 
+// DELETE audit log
+router.delete('/audit-logs/:id', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  const userRole = req.user?.role;
+
+  // Only allow administrators and superadmins to delete audit logs
+  if (userRole !== 'administrator' && userRole !== 'superadmin') {
+    return res.status(403).json({ error: 'Unauthorized: Only administrators can delete audit logs' });
+  }
+
+  const query = 'DELETE FROM audit_log WHERE id = ?';
+  db.query(query, [id], (err, result) => {
+    if (err) {
+      console.error('Error deleting audit log:', err);
+      return res.status(500).json({ error: 'Failed to delete audit log' });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Audit log not found' });
+    }
+
+    try {
+      logAudit(req.user, 'Delete', 'audit_log', id, null);
+    } catch (e) {
+      console.error('Audit log error:', e);
+    }
+
+    res.json({ message: 'Audit log deleted successfully' });
+  });
+});
+
 module.exports = router;
 
 

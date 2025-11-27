@@ -13,6 +13,8 @@ import {
   InputLabel,
   TextField,
   Chip,
+  Checkbox,
+  FormControlLabel,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -147,8 +149,10 @@ const AuditLogs = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState(false);
+  const [deleteLogId, setDeleteLogId] = useState(null);
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
 
-  const HARDCODED_PASSWORD = '20134507';
   const SESSION_DURATION = 60 * 60 * 1000; // 1 hour
 
   const settings = useSystemSettings();
@@ -330,16 +334,34 @@ const AuditLogs = () => {
     }
   }, [toast]);
 
-  // Handle password submit
-  const handlePasswordSubmit = () => {
-    if (passwordInput === HARDCODED_PASSWORD) {
-      setPasswordError('');
-      setPasswordDialogOpen(false);
-      setIsAuthenticated(true);
-      storeSession();
-      setToast({ message: 'Access granted', type: 'success' });
-    } else {
-      setPasswordError('Incorrect password. Please try again.');
+  // Handle password submit - verify confidential password
+  const handlePasswordSubmit = async () => {
+    if (!passwordInput) {
+      setPasswordError('Please enter the confidential password.');
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/confidential-password/verify`,
+        { password: passwordInput },
+        getAuthHeaders()
+      );
+
+      if (response.data.verified) {
+        setPasswordError('');
+        setPasswordDialogOpen(false);
+        setIsAuthenticated(true);
+        storeSession();
+        setToast({ message: 'Access granted', type: 'success' });
+        setPasswordInput('');
+      } else {
+        setPasswordError('Incorrect password. Please try again.');
+        setPasswordInput('');
+      }
+    } catch (error) {
+      console.error('Error verifying confidential password:', error);
+      setPasswordError(error.response?.data?.error || 'Failed to verify password. Please try again.');
       setPasswordInput('');
     }
   };
@@ -449,6 +471,44 @@ const AuditLogs = () => {
     setRefreshing(true);
     loadAuditLogs();
     setToast({ message: 'Logs refreshed', type: 'success' });
+  };
+
+  // Handle delete confirmation
+  const handleDeleteConfirm = (logId) => {
+    setDeleteLogId(logId);
+    setDeleteConfirmed(false);
+    setDeleteDialog(true);
+  };
+
+  // Handle delete audit log
+  const handleDeleteLog = async () => {
+    if (!deleteLogId) return;
+
+    setLoading(true);
+    try {
+      const response = await axios.delete(
+        `${API_BASE_URL}/audit-logs/${deleteLogId}`,
+        getAuthHeaders()
+      );
+
+      if (response.status === 200 || response.status === 204) {
+        setToast({ message: 'Audit log deleted successfully', type: 'success' });
+        await loadAuditLogs();
+        setDeleteDialog(false);
+        setDeleteLogId(null);
+        setDeleteConfirmed(false);
+      } else {
+        setToast({ message: 'Failed to delete audit log', type: 'error' });
+      }
+    } catch (error) {
+      console.error('Error deleting audit log:', error);
+      setToast({
+        message: error.response?.data?.error || 'Failed to delete audit log',
+        type: 'error',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Get unique actions for filter
@@ -1042,33 +1102,52 @@ const AuditLogs = () => {
                               borderTop: '1px solid #e5e7eb',
                               display: 'flex',
                               alignItems: 'center',
+                              justifyContent: 'space-between',
                               gap: 1,
                               fontSize: '11px',
                               color: '#6b7280',
                               fontFamily: 'sans-serif',
                             }}
                           >
-                            <Chip
-                              icon={getActionIcon(log.action)}
-                              label={log.action?.toUpperCase() || 'UNKNOWN'}
-                              size="small"
-                              sx={{
-                                height: 20,
-                                fontSize: '10px',
-                                backgroundColor: actionColor,
-                                color: 'white',
-                                fontWeight: 600,
-                                '& .MuiChip-icon': {
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Chip
+                                icon={getActionIcon(log.action)}
+                                label={log.action?.toUpperCase() || 'UNKNOWN'}
+                                size="small"
+                                sx={{
+                                  height: 20,
+                                  fontSize: '10px',
+                                  backgroundColor: actionColor,
                                   color: 'white',
-                                },
-                              }}
-                            />
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <CheckCircleIcon sx={{ fontSize: 14, color: '#10b981' }} />
-                              <Typography sx={{ fontSize: '11px' }}>
-                                Status: Success
-                              </Typography>
+                                  fontWeight: 600,
+                                  '& .MuiChip-icon': {
+                                    color: 'white',
+                                  },
+                                }}
+                              />
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <CheckCircleIcon sx={{ fontSize: 14, color: '#10b981' }} />
+                                <Typography sx={{ fontSize: '11px' }}>
+                                  Status: Success
+                                </Typography>
+                              </Box>
                             </Box>
+                            {isAdmin && (
+                              <Tooltip title="Delete Log">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleDeleteConfirm(log.id)}
+                                  sx={{
+                                    color: '#ef4444',
+                                    '&:hover': {
+                                      bgcolor: alpha('#ef4444', 0.1),
+                                    },
+                                  }}
+                                >
+                                  <DeleteIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              </Tooltip>
+                            )}
                           </Box>
                         </Box>
                       );
@@ -1101,6 +1180,232 @@ const AuditLogs = () => {
             </GlassCard>
           </Fade>
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog
+          open={deleteDialog}
+          onClose={() => {
+            setDeleteDialog(false);
+            setDeleteConfirmed(false);
+            setDeleteLogId(null);
+          }}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: {
+              borderRadius: 4,
+              bgcolor: settings?.accentColor || '#FEF9E1',
+              overflow: 'hidden',
+            },
+          }}
+        >
+          <DialogTitle
+            sx={{
+              background: `linear-gradient(135deg, ${settings?.primaryColor || '#A31D1D'} 0%, ${settings?.secondaryColor || '#8a4747'} 100%)`,
+              color: settings?.accentColor || '#FEF9E1',
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              p: 3,
+              fontWeight: 700,
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
+            <Box
+              sx={{
+                position: "absolute",
+                top: -20,
+                right: -20,
+                width: 100,
+                height: 100,
+                background: `radial-gradient(circle, ${alpha('#ffffff', 0.1)} 0%, transparent 70%)`,
+              }}
+            />
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, position: "relative", zIndex: 1 }}>
+              <Avatar
+                sx={{
+                  bgcolor: alpha('#ffffff', 0.2),
+                  width: 48,
+                  height: 48,
+                }}
+              >
+                <Warning sx={{ fontSize: 28, color: settings?.accentColor || '#FEF9E1' }} />
+              </Avatar>
+              <Box>
+                <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  Confirm Deletion
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.9, fontSize: "0.85rem" }}>
+                  This action requires confirmation
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton
+              onClick={() => {
+                setDeleteDialog(false);
+                setDeleteConfirmed(false);
+                setDeleteLogId(null);
+              }}
+              sx={{
+                color: settings?.accentColor || '#FEF9E1',
+                position: "relative",
+                zIndex: 1,
+                "&:hover": {
+                  bgcolor: alpha('#ffffff', 0.1),
+                },
+              }}
+            >
+              <CancelIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent sx={{ p: 4 }}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                textAlign: "center",
+                mb: 3,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: "50%",
+                  bgcolor: alpha(settings?.primaryColor || '#A31D1D', 0.1),
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  mb: 3,
+                }}
+              >
+                <Error sx={{ fontSize: 48, color: settings?.primaryColor || '#A31D1D' }} />
+              </Box>
+              <Typography
+                variant="h6"
+                sx={{
+                  color: settings?.textPrimaryColor || '#6D2323',
+                  fontWeight: 600,
+                  mb: 1.5,
+                }}
+              >
+                Are you sure you want to delete this audit log?
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  color: alpha(settings?.textPrimaryColor || '#6D2323', 0.7),
+                  mb: 3,
+                  lineHeight: 1.6,
+                }}
+              >
+                This action cannot be undone. Deleting this audit log will permanently remove it
+                from the system. This may affect compliance and audit trail integrity.
+              </Typography>
+            </Box>
+            <Box
+              sx={{
+                p: 2.5,
+                borderRadius: 2,
+                bgcolor: alpha(settings?.primaryColor || '#A31D1D', 0.08),
+                border: `2px solid ${alpha(settings?.primaryColor || '#A31D1D', 0.2)}`,
+                transition: "all 0.3s ease",
+                ...(deleteConfirmed && {
+                  bgcolor: alpha(settings?.primaryColor || '#A31D1D', 0.12),
+                  border: `2px solid ${settings?.primaryColor || '#A31D1D'}`,
+                }),
+              }}
+            >
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={deleteConfirmed}
+                    onChange={(e) => setDeleteConfirmed(e.target.checked)}
+                    sx={{
+                      color: settings?.primaryColor || '#A31D1D',
+                      '&.Mui-checked': {
+                        color: settings?.primaryColor || '#A31D1D',
+                      },
+                      '& .MuiSvgIcon-root': {
+                        fontSize: 28,
+                      },
+                    }}
+                  />
+                }
+                label={
+                  <Typography
+                    sx={{
+                      color: settings?.textPrimaryColor || '#6D2323',
+                      fontSize: "1rem",
+                      fontWeight: deleteConfirmed ? 600 : 500,
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    I understand this action cannot be undone
+                  </Typography>
+                }
+                sx={{
+                  m: 0,
+                  alignItems: "center",
+                }}
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions
+            sx={{
+              p: 3,
+              bgcolor: alpha(settings?.accentColor || '#FEF9E1', 0.5),
+              borderTop: `1px solid ${alpha(settings?.primaryColor || '#A31D1D', 0.1)}`,
+              gap: 2,
+            }}
+          >
+            <ProfessionalButton
+              onClick={() => {
+                setDeleteDialog(false);
+                setDeleteConfirmed(false);
+                setDeleteLogId(null);
+              }}
+              variant="outlined"
+              fullWidth
+              sx={{
+                borderColor: settings?.primaryColor || '#A31D1D',
+                color: settings?.primaryColor || '#A31D1D',
+                "&:hover": {
+                  borderColor: settings?.secondaryColor || '#8a4747',
+                  bgcolor: alpha(settings?.primaryColor || '#A31D1D', 0.05),
+                },
+              }}
+            >
+              Cancel
+            </ProfessionalButton>
+            <ProfessionalButton
+              onClick={handleDeleteLog}
+              variant="contained"
+              fullWidth
+              disabled={loading || !deleteConfirmed}
+              startIcon={loading ? <CircularProgress size={20} sx={{ color: "#ffffff" }} /> : <DeleteIcon />}
+              sx={{
+                bgcolor: deleteConfirmed
+                  ? settings?.primaryColor || '#A31D1D'
+                  : alpha(settings?.primaryColor || '#A31D1D', 0.3),
+                color: "#ffffff",
+                "&:hover": {
+                  bgcolor: deleteConfirmed
+                    ? settings?.secondaryColor || '#8a4747'
+                    : alpha(settings?.primaryColor || '#A31D1D', 0.3),
+                },
+                "&:disabled": {
+                  bgcolor: alpha(settings?.primaryColor || '#A31D1D', 0.2),
+                  color: alpha("#ffffff", 0.5),
+                },
+              }}
+            >
+              {loading ? "Deleting..." : "Delete Log"}
+            </ProfessionalButton>
+          </DialogActions>
+        </Dialog>
       </Box>
     </Box>
   );

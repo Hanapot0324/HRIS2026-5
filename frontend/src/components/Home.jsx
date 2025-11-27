@@ -218,6 +218,10 @@ const HAHAHA = () => {
         (notification.action_link && notification.action_link.includes('payslip'))) {
       setNotifModalOpen(false);
       navigate('/payslip');
+    } else if (notification.notification_type === 'contact' ||
+               (notification.action_link && notification.action_link.includes('settings'))) {
+      setNotifModalOpen(false);
+      navigate('/settings');
     } else if (notification.notification_type === 'announcement' || 
                (notification.action_link && notification.action_link.includes('announcement'))) {
       // Fetch the announcement details
@@ -1575,12 +1579,16 @@ const HAHAHA = () => {
                       backgroundColor: notif.read_status === 0 
                         ? (notif.notification_type === 'payslip' 
                             ? '#e8f5e9' 
+                            : notif.notification_type === 'contact'
+                            ? '#fff3e0'
                             : COLORS.secondary)
                         : COLORS.lightGray,
                       borderRadius: 2,
                       borderLeft: `4px solid ${
                         notif.notification_type === 'payslip' 
                           ? '#4caf50' 
+                          : notif.notification_type === 'contact'
+                          ? '#ff9800'
                           : COLORS.primary
                       }`,
                       cursor: 'pointer',
@@ -1604,6 +1612,8 @@ const HAHAHA = () => {
                           borderRadius: "50%",
                           background: notif.notification_type === 'payslip'
                             ? `linear-gradient(135deg, #4caf50, #2e7d32)`
+                            : notif.notification_type === 'contact'
+                            ? `linear-gradient(135deg, #ff9800, #f57c00)`
                             : `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.secondary})`,
                           mt: 0.5,
                           flexShrink: 0,
@@ -1617,6 +1627,8 @@ const HAHAHA = () => {
                           sx={{ 
                             color: notif.notification_type === 'payslip' 
                               ? '#2e7d32' 
+                              : notif.notification_type === 'contact'
+                              ? '#ff9800'
                               : COLORS.primary, 
                             mb: 0.5,
                             lineHeight: 1.4
@@ -1624,6 +1636,8 @@ const HAHAHA = () => {
                         >
                           {notif.notification_type === 'payslip' 
                             ? '💰 Payslip Available' 
+                            : notif.notification_type === 'contact'
+                            ? '📧 Contact Ticket Response'
                             : '📢 Notification'}
                         </Typography>
                         <Typography fontSize="0.85rem" color="textSecondary" sx={{ mb: 0.5 }}>

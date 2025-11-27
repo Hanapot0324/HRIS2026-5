@@ -11,6 +11,7 @@ import {
   Chip,
   Modal,
   IconButton,
+  CircularProgress,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -26,6 +27,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import ReorderIcon from '@mui/icons-material/Reorder';
 import LoadingOverlay from '../LoadingOverlay';
 import SuccessfullOverlay from '../SuccessfulOverlay';
+import usePageAccess from '../../hooks/usePageAccess';
+import AccessDenied from '../AccessDenied';
 
 const PhilHealthTable = () => {
   const [data, setData] = useState([]);
@@ -40,6 +43,16 @@ const PhilHealthTable = () => {
   const [loading, setLoading] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [successAction, setSuccessAction] = useState("");
+
+  //ACCESSING
+  // Dynamic page access control using component identifier
+  // The identifier 'philhealth' should match the component_identifier in the pages table
+  const {
+    hasAccess,
+    loading: accessLoading,
+    error: accessError,
+  } = usePageAccess('philhealth');
+  // ACCESSING END
 
   useEffect(() => {
     fetchPhilHealthData();
@@ -145,6 +158,39 @@ const PhilHealthTable = () => {
   };
 
   const inputStyle = { marginRight: 10, marginBottom: 10, width: 300.25 };
+
+  // ACCESSING 2
+  // Loading state
+  if (accessLoading) {
+    return (
+      <Container maxWidth="md" sx={{ py: 8 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+          }}
+        >
+          <CircularProgress sx={{ color: '#6d2323', mb: 2 }} />
+          <Typography variant="h6" sx={{ color: '#6d2323' }}>
+            Loading access information...
+          </Typography>
+        </Box>
+      </Container>
+    );
+  }
+  // Access denied state - Now using the reusable component
+  if (!accessLoading && hasAccess !== true) {
+    return (
+      <AccessDenied
+        title="Access Denied"
+        message="You do not have permission to access PhilHealth Table. Contact your administrator to request access."
+        returnPath="/admin-home"
+        returnButtonText="Return to Home"
+      />
+    );
+  }
+  //ACCESSING END2
 
   return (
     <Container sx={{ mt: 0 }}>

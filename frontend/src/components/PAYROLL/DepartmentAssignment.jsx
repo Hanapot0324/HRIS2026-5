@@ -59,6 +59,7 @@ import ReorderIcon from '@mui/icons-material/Reorder';
 import LoadingOverlay from '../LoadingOverlay';
 import AccessDenied from '../AccessDenied';
 import { useNavigate } from 'react-router-dom';
+import usePageAccess from '../../hooks/usePageAccess';
 import { styled, alpha } from '@mui/material/styles';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
 
@@ -429,44 +430,15 @@ const DepartmentAssignment = () => {
     setSnackbar({ open: true, message, severity });
   };
 
-  const [hasAccess, setHasAccess] = useState(null);
   const navigate = useNavigate();
 
   // Employee selection states
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [selectedEditEmployee, setSelectedEditEmployee] = useState(null);
 
-  useEffect(() => {
-    const userId = localStorage.getItem('employeeNumber');
-    const pageId = 11; // Different page ID for department assignment
-    if (!userId) {
-      setHasAccess(false);
-      return;
-    }
-    const checkAccess = async () => {
-      try {
-        const authHeaders = getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/page_access/${userId}`, {
-          method: 'GET',
-          ...authHeaders,
-        });
-        if (response.ok) {
-          const accessData = await response.json();
-          const hasPageAccess = accessData.some(
-            (access) =>
-              access.page_id === pageId && String(access.page_privilege) === '1'
-          );
-          setHasAccess(hasPageAccess);
-        } else {
-          setHasAccess(false);
-        }
-      } catch (error) {
-        console.error('Error checking access:', error);
-        setHasAccess(false);
-      }
-    };
-    checkAccess();
-  }, []);
+  // Dynamic page access control using component identifier
+  // Note: This component may need a new page entry in the database with identifier 'department-assignment'
+  const { hasAccess, loading: accessLoading, error: accessError } = usePageAccess('department-assignment');
 
   useEffect(() => {
     fetchAssignments();
@@ -709,7 +681,7 @@ const DepartmentAssignment = () => {
     );
   };
 
-  if (hasAccess === null) {
+  if (accessLoading) {
     return (
       <Container maxWidth="md" sx={{ py: 8 }}>
         <Box
@@ -728,7 +700,7 @@ const DepartmentAssignment = () => {
     );
   }
 
-  if (!hasAccess) {
+  if (hasAccess === false) {
     return (
       <AccessDenied
         title="Access Denied"

@@ -56,6 +56,7 @@ import ReorderIcon from '@mui/icons-material/Reorder';
 import LoadingOverlay from '../LoadingOverlay';
 import SuccessfullOverlay from '../SuccessfulOverlay';
 import AccessDenied from '../AccessDenied';
+import usePageAccess from '../../hooks/usePageAccess';
 import { useNavigate } from "react-router-dom";
 import { useSystemSettings } from '../../hooks/useSystemSettings';
 import {
@@ -477,7 +478,6 @@ const GraduateTable = () => {
     setSnackbar({ open: true, message, severity });
   };
 
-  const [hasAccess, setHasAccess] = useState(null);
   const navigate = useNavigate();
   
   // Color scheme
@@ -502,36 +502,8 @@ const GraduateTable = () => {
   const hoverColor = settings.hoverColor || '#6D2323';
   const grayColor = settings.textSecondaryColor || '#6c757d';
   
-  useEffect(() => {
-    const userId = localStorage.getItem('employeeNumber');
-    const pageId = 5;
-    if (!userId) {
-      setHasAccess(false);
-      return;
-    }
-    const checkAccess = async () => {
-      try {
-        const authHeaders = getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/page_access/${userId}`, {
-          method: "GET",
-          ...authHeaders,
-        });
-        if (response.ok) {
-          const accessData = await response.json();
-          const hasPageAccess = accessData.some(access => 
-            access.page_id === pageId && String(access.page_privilege) === '1'
-          );
-          setHasAccess(hasPageAccess);
-        } else {
-          setHasAccess(false);
-        }
-      } catch (error) {
-        console.error('Error checking access:', error);
-        setHasAccess(false);
-      }
-    };
-    checkAccess();
-  }, []);
+  // Dynamic page access control using component identifier
+  const { hasAccess, loading: accessLoading, error: accessError } = usePageAccess('graduate');
 
   useEffect(() => {
     fetchGraduates();
@@ -772,7 +744,7 @@ const GraduateTable = () => {
     );
   }
   
-  if (!hasAccess) {
+  if (hasAccess === false) {
     return (
       <AccessDenied 
         title="Access Denied"

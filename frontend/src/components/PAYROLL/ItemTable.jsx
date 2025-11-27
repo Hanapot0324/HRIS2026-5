@@ -53,6 +53,7 @@ import ReorderIcon from '@mui/icons-material/Reorder';
 import LoadingOverlay from '../LoadingOverlay';
 import SuccessfullOverlay from '../SuccessfulOverlay';
 import AccessDenied from '../AccessDenied';
+import usePageAccess from '../../hooks/usePageAccess';
 import { useNavigate } from 'react-router-dom';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
 
@@ -449,7 +450,6 @@ const ItemTable = () => {
   };
 
   const { settings } = useSystemSettings();
-  const [hasAccess, setHasAccess] = useState(null);
   const navigate = useNavigate();
 
   // Get colors from system settings
@@ -464,37 +464,9 @@ const ItemTable = () => {
   const whiteColor = '#FFFFFF';
   const grayColor = '#6c757d';
 
-  useEffect(() => {
-    const userId = localStorage.getItem('employeeNumber');
-    const pageId = 10; // Different page ID for items
-    if (!userId) {
-      setHasAccess(false);
-      return;
-    }
-    const checkAccess = async () => {
-      try {
-        const authHeaders = getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/page_access/${userId}`, {
-          method: 'GET',
-          ...authHeaders,
-        });
-        if (response.ok) {
-          const accessData = await response.json();
-          const hasPageAccess = accessData.some(
-            (access) =>
-              access.page_id === pageId && String(access.page_privilege) === '1'
-          );
-          setHasAccess(hasPageAccess);
-        } else {
-          setHasAccess(false);
-        }
-      } catch (error) {
-        console.error('Error checking access:', error);
-        setHasAccess(false);
-      }
-    };
-    checkAccess();
-  }, []);
+  // Dynamic page access control using component identifier
+  // Note: This component may need a new page entry in the database with identifier 'item-table'
+  const { hasAccess, loading: accessLoading, error: accessError } = usePageAccess('item-table');
 
   useEffect(() => {
     fetchItems();
@@ -771,7 +743,7 @@ const ItemTable = () => {
     return new Date().getFullYear().toString();
   };
 
-  if (hasAccess === null) {
+  if (accessLoading) {
     return (
       <Container maxWidth="md" sx={{ py: 8 }}>
         <Box
@@ -790,7 +762,7 @@ const ItemTable = () => {
     );
   }
 
-  if (!hasAccess) {
+  if (hasAccess === false) {
     return (
       <AccessDenied
         title="Access Denied"

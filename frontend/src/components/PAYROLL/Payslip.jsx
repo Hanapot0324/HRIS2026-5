@@ -40,6 +40,8 @@ import hrisLogo from '../../assets/hrisLogo.png';
 import SuccessfulOverlay from '../SuccessfulOverlay';
 import { Refresh, Download } from '@mui/icons-material';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
+import usePageAccess from '../../hooks/usePageAccess';
+import AccessDenied from '../AccessDenied';
 
 // Helper function to convert hex to rgb
 const hexToRgb = (hex) => {
@@ -144,6 +146,16 @@ const Payslip = forwardRef(({ employee }, ref) => {
   const whiteColor = '#FFFFFF';
   const grayColor = '#6c757d';
 
+  //ACCESSING
+  // Dynamic page access control using component identifier
+  // The identifier 'payslip' should match the component_identifier in the pages table
+  const {
+    hasAccess,
+    loading: accessLoading,
+    error: accessError,
+  } = usePageAccess('payslip');
+  // ACCESSING END
+
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
     console.log(
@@ -202,103 +214,137 @@ const Payslip = forwardRef(({ employee }, ref) => {
   const downloadPDF = async () => {
     if (!displayEmployee) return;
 
-    // Identify current month/year
-    const currentStart = new Date(displayEmployee.startDate);
-    const currentMonth = currentStart.getMonth();
-    const currentYear = currentStart.getFullYear();
+    // Store original employee to restore later
+    const originalEmployee = displayEmployee;
 
-    // Collect last 3 months
-    const monthsToGet = [0, 1, 2].map((i) => {
-      const d = new Date(currentYear, currentMonth - i, 1);
-      return {
-        month: d.getMonth(),
-        year: d.getFullYear(),
-        label: d.toLocaleString('en-US', { month: 'long', year: 'numeric' }),
-      };
-    });
+    try {
+      setSending(true);
 
-    // Find payroll records
-    const records = monthsToGet.map(({ month, year, label }) => {
-      const payroll = allPayroll.find(
-        (p) =>
-          p.employeeNumber === displayEmployee.employeeNumber &&
-          new Date(p.startDate).getMonth() === month &&
-          new Date(p.startDate).getFullYear() === year
-      );
-      return { payroll, label };
-    });
+      // Identify current month/year
+      const currentStart = new Date(displayEmployee.startDate);
+      const currentMonth = currentStart.getMonth();
+      const currentYear = currentStart.getFullYear();
 
-    // PDF setup
-    const pdf = new jsPDF('l', 'in', 'a4');
-    pdf.setFont('Arial', 'bold'); // or ('helvetica', 'normal') / ('courier', 'italic')
+      // Collect last 3 months
+      const monthsToGet = [0, 1, 2].map((i) => {
+        const d = new Date(currentYear, currentMonth - i, 1);
+        return {
+          month: d.getMonth(),
+          year: d.getFullYear(),
+          label: d.toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+        };
+      });
 
-    const contentWidth = 3.5;
-    const contentHeight = 7.1;
-    const gap = 0.2;
+      // Find payroll records
+      const records = monthsToGet.map(({ month, year, label }) => {
+        const payroll = allPayroll.find(
+          (p) =>
+            p.employeeNumber === displayEmployee.employeeNumber &&
+            new Date(p.startDate).getMonth() === month &&
+            new Date(p.startDate).getFullYear() === year
+        );
+        return { payroll, label };
+      });
 
-    const totalWidth = contentWidth * 3 + gap * 2;
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const yOffset = (pageHeight - contentHeight) / 2;
+      // PDF setup
+      const pdf = new jsPDF('l', 'in', 'a4');
+      pdf.setFont('helvetica', 'normal'); // Arial equivalent in jsPDF
 
-    const positions = [
-      (pageWidth - totalWidth) / 2,
-      (pageWidth - totalWidth) / 2 + contentWidth + gap,
-      (pageWidth - totalWidth) / 2 + (contentWidth + gap) * 2,
-    ];
+      const contentWidth = 3.5;
+      const contentHeight = 7.1;
+      const gap = 0.2;
 
-    // Render each slot
-    for (let i = 0; i < records.length; i++) {
-      const { payroll, label } = records[i];
-      let imgData;
+      const totalWidth = contentWidth * 3 + gap * 2;
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const yOffset = (pageHeight - contentHeight) / 2;
 
-      if (payroll) {
-        // Normal payslip
-        setDisplayEmployee(payroll);
-        await new Promise((resolve) => setTimeout(resolve, 300));
-        const input = payslipRef.current;
-        const canvas = await html2canvas(input, { scale: 2, useCORS: true });
-        imgData = canvas.toDataURL('image/png');
-      } else {
-        // No Data placeholder
-        const placeholderCanvas = document.createElement('canvas');
-        placeholderCanvas.width = 600;
-        placeholderCanvas.height = 1200;
-        const ctx = placeholderCanvas.getContext('2d');
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, placeholderCanvas.width, placeholderCanvas.height);
-        ctx.fillStyle = '#6D2323';
-        ctx.font = 'bold 28px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('No Data', placeholderCanvas.width / 2, 500);
-        ctx.font = '20px Arial';
-        ctx.fillText(`for ${label}`, placeholderCanvas.width / 2, 550);
-        imgData = placeholderCanvas.toDataURL('image/png');
+      const positions = [
+        (pageWidth - totalWidth) / 2,
+        (pageWidth - totalWidth) / 2 + contentWidth + gap,
+        (pageWidth - totalWidth) / 2 + (contentWidth + gap) * 2,
+      ];
+
+      // Render each slot
+      for (let i = 0; i < records.length; i++) {
+        const { payroll, label } = records[i];
+        let imgData;
+
+        if (payroll) {
+          // Normal payslip - update state and wait for render
+          setDisplayEmployee(payroll);
+          await new Promise((resolve) => setTimeout(resolve, 600));
+          
+          const input = payslipRef.current;
+          if (!input) {
+            console.error('Payslip ref not found');
+            continue;
+          }
+
+          const canvas = await html2canvas(input, { 
+            scale: 3, 
+            useCORS: true,
+            logging: false,
+            letterRendering: true,
+            allowTaint: false,
+            backgroundColor: '#ffffff',
+            windowWidth: input.scrollWidth,
+            windowHeight: input.scrollHeight,
+          });
+          imgData = canvas.toDataURL('image/png', 1.0);
+        } else {
+          // No Data placeholder - maintain same aspect ratio as content
+          const placeholderAspectRatio = contentHeight / contentWidth;
+          const placeholderWidth = 600;
+          const placeholderHeight = placeholderWidth * placeholderAspectRatio;
+          
+          const placeholderCanvas = document.createElement('canvas');
+          placeholderCanvas.width = placeholderWidth;
+          placeholderCanvas.height = placeholderHeight;
+          const ctx = placeholderCanvas.getContext('2d');
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, 0, placeholderCanvas.width, placeholderCanvas.height);
+          ctx.fillStyle = '#6D2323';
+          ctx.font = 'bold 28px Arial, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('No Data', placeholderCanvas.width / 2, placeholderCanvas.height / 2 - 30);
+          ctx.font = '20px Arial, sans-serif';
+          ctx.fillText(`for ${label}`, placeholderCanvas.width / 2, placeholderCanvas.height / 2 + 20);
+          imgData = placeholderCanvas.toDataURL('image/png');
+        }
+
+        // Add to PDF with fixed dimensions
+        pdf.addImage(
+          imgData,
+          'PNG',
+          positions[i],
+          yOffset,
+          contentWidth,
+          contentHeight
+        );
       }
 
-      // Add to PDF
-      pdf.addImage(
-        imgData,
-        'PNG',
-        positions[i],
-        yOffset,
-        contentWidth,
-        contentHeight
-      );
+      // Save file
+      pdf.save(`${originalEmployee.name || 'EARIST'}-Payslips-3Months.pdf`);
+
+      // Show success overlay
+      setModal({
+        open: true,
+        type: 'success',
+        action: 'download',
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      setModal({
+        open: true,
+        type: 'error',
+        message: 'Failed to generate PDF. Please try again.',
+      });
+    } finally {
+      // Restore original state
+      setDisplayEmployee(originalEmployee);
+      setSending(false);
     }
-
-    // Save file
-    pdf.save(`${displayEmployee.name || 'EARIST'}-Payslips-3Months.pdf`);
-
-    // Show success overlay
-    setModal({
-      open: true,
-      type: 'success',
-      action: 'download',
-    });
-
-    // Restore state
-    setDisplayEmployee(displayEmployee);
   };
 
   // For Search
@@ -358,6 +404,39 @@ const Payslip = forwardRef(({ employee }, ref) => {
     setDisplayEmployee(result.length > 0 ? result[0] : null);
     setHasSearched(true);
   };
+
+  // ACCESSING 2
+  // Loading state
+  if (accessLoading) {
+    return (
+      <Container maxWidth="md" sx={{ py: 8 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+          }}
+        >
+          <CircularProgress sx={{ color: '#6d2323', mb: 2 }} />
+          <Typography variant="h6" sx={{ color: '#6d2323' }}>
+            Loading access information...
+          </Typography>
+        </Box>
+      </Container>
+    );
+  }
+  // Access denied state - Now using the reusable component
+  if (!accessLoading && hasAccess !== true) {
+    return (
+      <AccessDenied
+        title="Access Denied"
+        message="You do not have permission to access Payslip. Contact your administrator to request access."
+        returnPath="/admin-home"
+        returnButtonText="Return to Home"
+      />
+    );
+  }
+  //ACCESSING END2
 
   return (
     <Box sx={{ 
@@ -654,9 +733,12 @@ const Payslip = forwardRef(({ employee }, ref) => {
                   border: '2px solid black',
                   borderRadius: 1,
                   backgroundColor: '#fff',
-                  fontFamily: 'Arial, sans-serif',
+                  fontFamily: 'Arial, "Helvetica Neue", Helvetica, sans-serif !important',
                   position: 'relative', // ✅ important for watermark positioning
                   overflow: 'hidden',
+                  '& *': {
+                    fontFamily: 'Arial, "Helvetica Neue", Helvetica, sans-serif !important',
+                  },
                 }}
               >
                 <Box
@@ -696,17 +778,17 @@ const Payslip = forwardRef(({ employee }, ref) => {
 
                   {/* Center Text */}
                   <Box textAlign="center" flex={1} sx={{ color: 'white' }}>
-                    <Typography variant="subtitle2" sx={{ fontStyle: 'italic' }}>
+                    <Typography variant="subtitle2" sx={{ fontStyle: 'italic', fontFamily: 'Arial, sans-serif' }}>
                       Republic of the Philippines
                     </Typography>
                     <Typography
                       variant="subtitle5"
                       fontWeight="bold"
-                      sx={{ ml: '25px' }}
+                      sx={{ ml: '25px', fontFamily: 'Arial, sans-serif' }}
                     >
                       EULOGIO "AMANG" RODRIGUEZ INSTITUTE OF SCIENCE AND TECHNOLOGY
                     </Typography>
-                    <Typography variant="body2">Nagtahan, Sampaloc Manila</Typography>
+                    <Typography variant="body2" sx={{ fontFamily: 'Arial, sans-serif' }}>Nagtahan, Sampaloc Manila</Typography>
                   </Box>
 
                   {/* Right Logo */}
@@ -722,7 +804,7 @@ const Payslip = forwardRef(({ employee }, ref) => {
                     {
                       label: 'PERIOD:',
                       value: (
-                        <span style={{ fontWeight: 'bold' }}>
+                        <span style={{ fontWeight: 'bold', fontFamily: 'Arial, sans-serif' }}>
                           {(() => {
                             if (
                               !displayEmployee.startDate ||
@@ -742,7 +824,7 @@ const Payslip = forwardRef(({ employee }, ref) => {
                     {
                       label: 'EMPLOYEE NUMBER:',
                       value: (
-                        <Typography sx={{ color: 'red', fontWeight: 'bold' }}>
+                        <Typography sx={{ color: 'red', fontWeight: 'bold', fontFamily: 'Arial, sans-serif' }}>
                           {displayEmployee.employeeNumber &&
                           parseFloat(displayEmployee.employeeNumber) !== 0
                             ? `${parseFloat(displayEmployee.employeeNumber)}`
@@ -753,7 +835,7 @@ const Payslip = forwardRef(({ employee }, ref) => {
                     {
                       label: 'NAME:',
                       value: (
-                        <Typography sx={{ color: 'red', fontWeight: 'bold' }}>
+                        <Typography sx={{ color: 'red', fontWeight: 'bold', fontFamily: 'Arial, sans-serif' }}>
                           {displayEmployee.name ? `${displayEmployee.name}` : ''}
                         </Typography>
                       ),
@@ -1038,7 +1120,7 @@ const Payslip = forwardRef(({ employee }, ref) => {
                     >
                       {/* Left column (label) */}
                       <Box sx={{ p: 1, width: '25%' }}>
-                        <Typography fontWeight="bold">{row.label}</Typography>
+                        <Typography fontWeight="bold" sx={{ fontFamily: 'Arial, sans-serif' }}>{row.label}</Typography>
                       </Box>
 
                       {/* Right column (value with left border) */}
@@ -1049,7 +1131,7 @@ const Payslip = forwardRef(({ employee }, ref) => {
                           borderLeft: '1px solid black',
                         }}
                       >
-                        <Typography>{row.value}</Typography>
+                        <Typography sx={{ fontFamily: 'Arial, sans-serif' }}>{row.value}</Typography>
                       </Box>
                     </Box>
                   ))}
@@ -1063,7 +1145,7 @@ const Payslip = forwardRef(({ employee }, ref) => {
                   mt={2}
                   sx={{ fontSize: '0.85rem' }}
                 >
-                  <Typography>Certified Correct:</Typography>
+                  <Typography sx={{ fontFamily: 'Arial, sans-serif' }}>Certified Correct:</Typography>
                 </Box>
 
                 <Box
@@ -1072,11 +1154,11 @@ const Payslip = forwardRef(({ employee }, ref) => {
                   alignItems="center"
                   mt={2}
                 >
-                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 'bold' }}>
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 'bold', fontFamily: 'Arial, sans-serif' }}>
                     GIOVANNI L. AHUNIN
                   </Typography>
                 </Box>
-                <Typography>Director, Administrative Services</Typography>
+                <Typography sx={{ fontFamily: 'Arial, sans-serif' }}>Director, Administrative Services</Typography>
               </Paper>
             </GlassCard>
           </Fade>
@@ -1186,20 +1268,23 @@ const Payslip = forwardRef(({ employee }, ref) => {
                 <ProfessionalButton
                   variant="contained"
                   fullWidth
-                  startIcon={<Download />}
+                  startIcon={sending ? <CircularProgress size={20} color="inherit" /> : <Download />}
                   onClick={downloadPDF}
+                  disabled={sending}
                   sx={{
                     py: 2,
                     bgcolor: accentColor,
-                    color: textSecondaryColor,
                     color: primaryColor,
                     fontSize: '1rem',
                     '&:hover': {
                       bgcolor: accentDark,
+                    },
+                    '&:disabled': {
+                      bgcolor: alpha(accentColor, 0.6),
                     }
                   }}
                 >
-                  Download Payslip | PDF
+                  {sending ? 'Generating PDF...' : 'Download Payslip | PDF'}
                 </ProfessionalButton>
               </CardContent>
             </GlassCard>

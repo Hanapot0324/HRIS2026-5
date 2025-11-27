@@ -45,6 +45,7 @@ import {
   LocalHospital as LocalHospitalIcon,
   TableChart as TableChartIcon,
   PeopleAlt as PeopleAltIcon,
+  People as PeopleIcon,
   MonetizationOn as MonetizationOnIcon,
   Business as BusinessIcon,
   BusinessCenter as BusinessCenterIcon,
@@ -66,7 +67,8 @@ import {
   NewReleases,
   Lock,
   LockOpen,
-  Assessment
+  Assessment,
+  Settings
 } from '@mui/icons-material';
 import {
   AccessAlarm,
@@ -81,6 +83,7 @@ import {
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import logo from '../assets/logo.PNG';
+import { getAuthHeaders } from '../utils/auth';
 
 const useSystemSettings = () => {
   const [settings, setSettings] = useState({
@@ -172,6 +175,7 @@ const Sidebar = ({
   const [profilePicture, setProfilePicture] = useState('');
   const [employeeNumber, setEmployeeNumber] = useState('');
   const [logoutOpen, setLogoutOpen] = useState(false);
+  const [hasUsersListAccess, setHasUsersListAccess] = useState(false);
   const settings = useSystemSettings();
 
 
@@ -216,6 +220,83 @@ const Sidebar = ({
       fetchProfileData();
     }
   }, [employeeNumber, location.pathname]);
+
+  // Check page access for Users List
+  useEffect(() => {
+    const checkUsersListAccess = async () => {
+      if (!employeeNumber) {
+        setHasUsersListAccess(false);
+        return;
+      }
+
+      try {
+        // First, get all pages to find the Users List page ID
+        const authHeaders = getAuthHeaders();
+        const pagesResponse = await fetch(`${API_BASE_URL}/pages`, {
+          method: 'GET',
+          ...authHeaders,
+        });
+
+        if (pagesResponse.ok) {
+          let pagesData = await pagesResponse.json();
+          pagesData = Array.isArray(pagesData)
+            ? pagesData
+            : pagesData.pages || pagesData.data || [];
+          
+          // Find the Users List page by name (case-insensitive)
+          const usersListPage = pagesData.find(
+            (page) =>
+              page.page_name &&
+              (page.page_name.toLowerCase().includes('user') ||
+               page.page_name.toLowerCase().includes('users list') ||
+               page.page_name.toLowerCase().includes('user management'))
+          );
+
+          if (usersListPage) {
+            const pageId = usersListPage.id;
+            
+            // Check if user has access to this page
+            const accessResponse = await fetch(
+              `${API_BASE_URL}/page_access/${employeeNumber}`,
+              {
+                method: 'GET',
+                ...authHeaders,
+              }
+            );
+
+            if (accessResponse.ok) {
+              const accessDataRaw = await accessResponse.json();
+              const accessData = Array.isArray(accessDataRaw)
+                ? accessDataRaw
+                : accessDataRaw.data || [];
+              
+              const hasAccess = accessData.some(
+                (access) =>
+                  access.page_id === pageId &&
+                  String(access.page_privilege) === '1'
+              );
+              
+              setHasUsersListAccess(hasAccess);
+            } else {
+              setHasUsersListAccess(false);
+            }
+          } else {
+            // If page not found, default to false
+            setHasUsersListAccess(false);
+          }
+        } else {
+          setHasUsersListAccess(false);
+        }
+      } catch (error) {
+        console.error('Error checking Users List access:', error);
+        setHasUsersListAccess(false);
+      }
+    };
+
+    if (employeeNumber) {
+      checkUsersListAccess();
+    }
+  }, [employeeNumber]);
 
   
 
@@ -340,6 +421,10 @@ const Sidebar = ({
     setSelectedItem('reports');
   } else if (currentPath === '/employee-reports') {
     setSelectedItem('employee-reports');
+  } else if (currentPath === '/users-list') {
+    setSelectedItem('users-list');
+  } else if (currentPath === '/settings') {
+    setSelectedItem('settings');
   } else if (currentPath === '/profile') {
     setSelectedItem(null);
   } else {
@@ -1151,6 +1236,76 @@ const Sidebar = ({
             </ListItem>
 
             )}
+
+            {/* Users List - Conditionally shown based on page access */}
+            {hasUsersListAccess && (
+            <ListItem
+              button
+              component={Link}
+              to="/users-list"
+              onClick={() => handleItemClick('users-list')}
+              sx={{
+                bgcolor: selectedItem === 'users-list' ? (settings.accentColor || '#FEF9E1') : 'inherit',
+                color: selectedItem === 'users-list' ? settings.textPrimaryColor : (settings.textSecondaryColor),
+
+                '& .MuiListItemIcon-root': {
+                  color: selectedItem === 'users-list' ? settings.textPrimaryColor : (settings.textSecondaryColor),
+                },
+                '& .MuiListItemText-primary': {
+                  color: selectedItem === 'users-list' ? settings.textPrimaryColor : (settings.textSecondaryColor),
+                },
+
+                '&:hover': {
+                  bgcolor: settings.hoverColor || '#6D2323',
+                  color: settings.textSecondaryColor,
+                  '& .MuiListItemIcon-root': { color: settings.textSecondaryColor },
+                  '& .MuiListItemText-primary': { color: settings.textSecondaryColor },
+                },
+
+                borderTopRightRadius: selectedItem === 'users-list' ? '15px' : 0,
+                borderBottomRightRadius: selectedItem === 'users-list' ? '15px' : 0,
+              }}
+            >
+              <ListItemIcon>
+                <PeopleIcon sx={{ fontSize: 29, marginLeft: '-6%' }} />
+              </ListItemIcon>
+              <ListItemText primary="User Management" sx={{ marginLeft: '-10px' }} />
+            </ListItem>
+            )}
+
+            {/* Settings - Available to all users */}
+            <ListItem
+              button
+              component={Link}
+              to="/settings"
+              onClick={() => handleItemClick('settings')}
+              sx={{
+                bgcolor: selectedItem === 'settings' ? (settings.accentColor || '#FEF9E1') : 'inherit',
+                color: selectedItem === 'settings' ? settings.textPrimaryColor : (settings.textSecondaryColor),
+
+                '& .MuiListItemIcon-root': {
+                  color: selectedItem === 'settings' ? settings.textPrimaryColor : (settings.textSecondaryColor),
+                },
+                '& .MuiListItemText-primary': {
+                  color: selectedItem === 'settings' ? settings.textPrimaryColor : (settings.textSecondaryColor),
+                },
+
+                '&:hover': {
+                  bgcolor: settings.hoverColor || '#6D2323',
+                  color: settings.textSecondaryColor,
+                  '& .MuiListItemIcon-root': { color: settings.textSecondaryColor },
+                  '& .MuiListItemText-primary': { color: settings.textSecondaryColor },
+                },
+
+                borderTopRightRadius: selectedItem === 'settings' ? '15px' : 0,
+                borderBottomRightRadius: selectedItem === 'settings' ? '15px' : 0,
+              }}
+            >
+              <ListItemIcon>
+                <Settings sx={{ fontSize: 29, marginLeft: '-6%' }} />
+              </ListItemIcon>
+              <ListItemText primary="Settings" sx={{ marginLeft: '-10px' }} />
+            </ListItem>
 
             
             {userRole !== 'staff' && (

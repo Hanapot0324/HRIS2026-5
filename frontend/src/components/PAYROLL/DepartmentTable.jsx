@@ -53,6 +53,7 @@ import LoadingOverlay from '../LoadingOverlay';
 import SuccessfullOverlay from '../SuccessfulOverlay';
 import AccessDenied from '../AccessDenied';
 import { useNavigate } from 'react-router-dom';
+import usePageAccess from '../../hooks/usePageAccess';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
 
 // Helper function to convert hex to rgb
@@ -144,7 +145,6 @@ const DepartmentTable = () => {
     severity: 'success',
   });
 
-  const [hasAccess, setHasAccess] = useState(null);
   const navigate = useNavigate();
 
   const showSnackbar = (message, severity = 'success') => {
@@ -169,37 +169,9 @@ const DepartmentTable = () => {
     };
   };
 
-  useEffect(() => {
-    const userId = localStorage.getItem('employeeNumber');
-    const pageId = 9; // Assuming a different page ID for departments
-    if (!userId) {
-      setHasAccess(false);
-      return;
-    }
-    const checkAccess = async () => {
-      try {
-        const authHeaders = getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/page_access/${userId}`, {
-          method: 'GET',
-          ...authHeaders,
-        });
-        if (response.ok) {
-          const accessData = await response.json();
-          const hasPageAccess = accessData.some(
-            (access) =>
-              access.page_id === pageId && String(access.page_privilege) === '1'
-          );
-          setHasAccess(hasPageAccess);
-        } else {
-          setHasAccess(false);
-        }
-      } catch (error) {
-        console.error('Error checking access:', error);
-        setHasAccess(false);
-      }
-    };
-    checkAccess();
-  }, []);
+  // Dynamic page access control using component identifier
+  // Note: This component may need a new page entry in the database with identifier 'department-table'
+  const { hasAccess, loading: accessLoading, error: accessError } = usePageAccess('department-table');
 
   useEffect(() => {
     fetchData();
@@ -340,7 +312,7 @@ const DepartmentTable = () => {
     return code.includes(search) || description.includes(search);
   });
 
-  if (hasAccess === null) {
+  if (accessLoading) {
     return (
       <Container maxWidth="md" sx={{ py: 8 }}>
         <Box
@@ -359,7 +331,7 @@ const DepartmentTable = () => {
     );
   }
 
-  if (!hasAccess) {
+  if (hasAccess === false) {
     return (
       <AccessDenied
         title="Access Denied"

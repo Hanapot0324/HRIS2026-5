@@ -65,6 +65,7 @@ import LoadingOverlay from '../LoadingOverlay';
 import SuccessfullOverlay from '../SuccessfulOverlay';
 import AccessDenied from '../AccessDenied';
 import { useNavigate } from 'react-router-dom';
+import usePageAccess from '../../hooks/usePageAccess';
 
 // Employee Autocomplete Component
 const EmployeeAutocomplete = ({
@@ -340,42 +341,9 @@ const PersonTable = () => {
   const [activeStep, setActiveStep] = useState(0);
 
   //ACCESSING
-  // Page access control states
-  const [hasAccess, setHasAccess] = useState(null);
+  // Dynamic page access control using component identifier
   const navigate = useNavigate();
-  // Page access control - Add this useEffect
-  useEffect(() => {
-    const userId = localStorage.getItem('employeeNumber');
-    // Change this pageId to match the ID you assign to this page in your page management
-    const pageId = 2; // You'll need to set this to the appropriate page ID for ViewAttendanceRecord
-    if (!userId) {
-      setHasAccess(false);
-      return;
-    }
-    const checkAccess = async () => {
-      try {
-        const authHeaders = getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/page_access/${userId}`, {
-          method: 'GET',
-          ...authHeaders,
-        });
-        if (response.ok) {
-          const accessData = await response.json();
-          const hasPageAccess = accessData.some(
-            (access) =>
-              access.page_id === pageId && String(access.page_privilege) === '1'
-          );
-          setHasAccess(hasPageAccess);
-        } else {
-          setHasAccess(false);
-        }
-      } catch (error) {
-        console.error('Error checking access:', error);
-        setHasAccess(false);
-      }
-    };
-    checkAccess();
-  }, []);
+  const { hasAccess, loading: accessLoading, error: accessError } = usePageAccess('personalinfo');
   // ACCESSING END
 
   // Stepper state
@@ -1196,7 +1164,7 @@ const PersonTable = () => {
 
   // ACCESSING 2
   // Loading state
-  if (hasAccess === null) {
+  if (accessLoading) {
     return (
       <Container maxWidth="md" sx={{ py: 8 }}>
         <Box
@@ -1215,7 +1183,7 @@ const PersonTable = () => {
     );
   }
   // Access denied state - Now using the reusable component
-  if (!hasAccess) {
+  if (hasAccess === false) {
     return (
       <AccessDenied
         title="Access Denied"

@@ -51,6 +51,7 @@ import ReorderIcon from '@mui/icons-material/Reorder';
 import LoadingOverlay from '../LoadingOverlay';
 import SuccessfullOverlay from '../SuccessfulOverlay';
 import AccessDenied from '../AccessDenied';
+import usePageAccess from '../../hooks/usePageAccess';
 import { useNavigate } from 'react-router-dom';
 import { useSystemSettings } from '../../hooks/useSystemSettings';
 
@@ -251,7 +252,10 @@ const EmployeeAutocomplete = ({
       onEmployeeSelect(employee);
       setQuery(employee.name || '');
     } catch (error) {
-      console.error('Error fetching employee by ID:', error);
+      // Suppress 404 errors for missing employees (expected behavior)
+      if (error.response?.status !== 404) {
+        console.error('Error fetching employee by ID:', error);
+      }
     }
   };
 
@@ -459,7 +463,6 @@ const EmployeeRemittance = () => {
   };
 
   const { settings } = useSystemSettings();
-  const [hasAccess, setHasAccess] = useState(null);
   const navigate = useNavigate();
 
   // Get colors from system settings
@@ -474,37 +477,13 @@ const EmployeeRemittance = () => {
   const whiteColor = '#FFFFFF';
   const grayColor = '#6c757d';
 
-  useEffect(() => {
-    const userId = localStorage.getItem('employeeNumber');
-    const pageId = 9; // Different page ID for remittances
-    if (!userId) {
-      setHasAccess(false);
-      return;
-    }
-    const checkAccess = async () => {
-      try {
-        const authHeaders = getAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/page_access/${userId}`, {
-          method: 'GET',
-          ...authHeaders,
-        });
-        if (response.ok) {
-          const accessData = await response.json();
-          const hasPageAccess = accessData.some(
-            (access) =>
-              access.page_id === pageId && String(access.page_privilege) === '1'
-          );
-          setHasAccess(hasPageAccess);
-        } else {
-          setHasAccess(false);
-        }
-      } catch (error) {
-        console.error('Error checking access:', error);
-        setHasAccess(false);
-      }
-    };
-    checkAccess();
-  }, []);
+  // Dynamic page access control using component identifier
+  // Note: This component may need a new page entry in the database with identifier 'remittances'
+  const {
+    hasAccess,
+    loading: accessLoading,
+    error: accessError,
+  } = usePageAccess('remittances');
 
   useEffect(() => {
     fetchRemittances();
@@ -533,6 +512,10 @@ const EmployeeRemittance = () => {
             );
             namesMap[id] = response.data.name || 'Unknown';
           } catch (error) {
+            // Suppress 404 errors for missing employees (expected behavior)
+            if (error.response?.status !== 404) {
+              console.error(`Error fetching employee ${id}:`, error);
+            }
             namesMap[id] = 'Unknown';
           }
         })
@@ -834,7 +817,7 @@ const EmployeeRemittance = () => {
     feu: 'FEU',
   };
 
-  if (hasAccess === null) {
+  if (accessLoading) {
     return (
       <Container maxWidth="md" sx={{ py: 8 }}>
         <Box
@@ -853,7 +836,7 @@ const EmployeeRemittance = () => {
     );
   }
 
-  if (!hasAccess) {
+  if (hasAccess === false) {
     return (
       <AccessDenied
         title="Access Denied"

@@ -6,7 +6,7 @@ const { authenticateToken } = require('../middleware/auth');
 // GET ALL PAGES
 router.get('/pages', authenticateToken, async (req, res) => {
   const query = `
-    SELECT id, page_name, page_description, page_url, page_group
+    SELECT id, page_name, page_description, page_url, page_group, component_identifier
     FROM pages
     ORDER BY page_description ASC
   `;
@@ -26,9 +26,43 @@ router.get('/pages', authenticateToken, async (req, res) => {
   }
 });
 
+// GET PAGE BY COMPONENT IDENTIFIER (for dynamic page access)
+router.get('/pages/by-identifier/:identifier', authenticateToken, async (req, res) => {
+  const { identifier } = req.params;
+
+  if (!identifier) {
+    return res.status(400).json({ error: 'Component identifier is required' });
+  }
+
+  try {
+    const query = `
+      SELECT id, page_name, page_description, page_url, page_group, component_identifier
+      FROM pages
+      WHERE component_identifier = ?
+      LIMIT 1
+    `;
+
+    db.query(query, [identifier], (err, result) => {
+      if (err) {
+        console.error('Error fetching page by identifier:', err);
+        return res.status(500).json({ error: 'Failed to fetch page' });
+      }
+
+      if (result.length === 0) {
+        return res.status(404).json({ error: 'Page not found for the given identifier' });
+      }
+
+      res.status(200).json(result[0]);
+    });
+  } catch (err) {
+    console.error('Error during page fetch by identifier:', err);
+    res.status(500).json({ error: 'Failed to fetch page' });
+  }
+});
+
 // CREATE PAGE
 router.post('/pages', authenticateToken, async (req, res) => {
-  const { page_name, page_description, page_url, page_group } = req.body;
+  const { page_name, page_description, page_url, page_group, component_identifier } = req.body;
 
   // Validate required fields
   if (!page_name || !page_description || !page_group) {
@@ -39,13 +73,13 @@ router.post('/pages', authenticateToken, async (req, res) => {
 
   try {
     const query = `
-      INSERT INTO pages (page_name, page_description, page_url, page_group)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO pages (page_name, page_description, page_url, page_group, component_identifier)
+      VALUES (?, ?, ?, ?, ?)
     `;
 
     db.query(
       query,
-      [page_name, page_description, page_url || null, page_group],
+      [page_name, page_description, page_url || null, page_group, component_identifier || null],
       (err, result) => {
         if (err) {
           console.error('Error creating page:', err);
@@ -67,18 +101,18 @@ router.post('/pages', authenticateToken, async (req, res) => {
 // UPDATE PAGE
 router.put('/pages/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const { page_name, page_description, page_url, page_group } = req.body;
+  const { page_name, page_description, page_url, page_group, component_identifier } = req.body;
 
   try {
     const query = `
       UPDATE pages 
-      SET page_name = ?, page_description = ?, page_url = ?, page_group = ?
+      SET page_name = ?, page_description = ?, page_url = ?, page_group = ?, component_identifier = ?
       WHERE id = ?
     `;
 
     db.query(
       query,
-      [page_name, page_description, page_url, page_group, id],
+      [page_name, page_description, page_url, page_group, component_identifier || null, id],
       (err, result) => {
         if (err) {
           console.error('Error updating page:', err);

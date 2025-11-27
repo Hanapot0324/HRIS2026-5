@@ -2768,6 +2768,12 @@ const AdminHome = () => {
       setNotifModalOpen(false);
       navigate('/payslip');
     } else if (
+      notification.notification_type === 'contact' ||
+      (notification.action_link && notification.action_link.includes('settings'))
+    ) {
+      setNotifModalOpen(false);
+      navigate('/settings');
+    } else if (
       notification.notification_type === 'announcement' ||
       (notification.action_link &&
         notification.action_link.includes('announcement'))
@@ -3465,6 +3471,8 @@ const AdminHome = () => {
                             notif.read_status === 0
                               ? notif.notification_type === 'payslip'
                                 ? 'rgba(76, 175, 80, 0.1)'
+                                : notif.notification_type === 'contact'
+                                ? 'rgba(255, 152, 0, 0.1)'
                                 : `${settings.primaryColor}1A`
                               : `${settings.primaryColor}0A`,
                           border: `1px solid ${settings.primaryColor}26`,
@@ -3472,6 +3480,8 @@ const AdminHome = () => {
                             notif.read_status === 0
                               ? notif.notification_type === 'payslip'
                                 ? '4px solid #4caf50'
+                                : notif.notification_type === 'contact'
+                                ? '4px solid #ff9800'
                                 : `4px solid ${settings.primaryColor}`
                               : `1px solid ${settings.primaryColor}26`,
                           cursor: 'pointer',
@@ -3501,6 +3511,8 @@ const AdminHome = () => {
                               background:
                                 notif.notification_type === 'payslip'
                                   ? `linear-gradient(135deg, #4caf50, #2e7d32)`
+                                  : notif.notification_type === 'contact'
+                                  ? `linear-gradient(135deg, #ff9800, #f57c00)`
                                   : `linear-gradient(135deg, ${settings.primaryColor}, ${settings.secondaryColor})`,
                               mt: 0.5,
                               flexShrink: 0,
@@ -3520,6 +3532,8 @@ const AdminHome = () => {
                             >
                               {notif.notification_type === 'payslip'
                                 ? 'Payslip Available'
+                                : notif.notification_type === 'contact'
+                                ? 'New Contact Ticket'
                                 : 'Notification'}
                             </Typography>
                             <Typography

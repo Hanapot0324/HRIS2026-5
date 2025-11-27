@@ -1,6 +1,7 @@
 import API_BASE_URL from '../../apiConfig';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
 import {
   Table,
   TableHead,
@@ -35,9 +36,18 @@ import {
   AppBar,
   Toolbar,
   Badge,
+  styled,
+  alpha,
+  Fade,
+  Avatar,
+  Slider,
+  Fab,
 } from '@mui/material';
 import LoadingOverlay from '../LoadingOverlay';
 import SuccessfulOverlay from '../SuccessfulOverlay';
+import { useSystemSettings } from '../../hooks/useSystemSettings';
+import usePageAccess from '../../hooks/usePageAccess';
+import AccessDenied from '../AccessDenied';
 import SearchIcon from '@mui/icons-material/Search';
 import BusinessCenterIcon from '@mui/icons-material/BusinessCenter';
 import {
@@ -58,10 +68,15 @@ import {
   GetApp,
   CheckCircle,
   Error,
+  Warning,
   Info,
   Refresh,
   Dashboard,
   Assessment,
+  ZoomIn,
+  ZoomOut,
+  GridOn,
+  FindInPage,
 } from '@mui/icons-material';
 import PeopleIcon from '@mui/icons-material/People';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
@@ -70,6 +85,134 @@ import CircleIcon from '@mui/icons-material/Circle';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PendingIcon from '@mui/icons-material/Pending';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+
+// Helper function to convert hex to rgb
+const hexToRgb = (hex) => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result
+    ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(
+        result[3],
+        16
+      )}`
+    : '109, 35, 35';
+};
+
+// Professional styled components - colors will be applied via sx prop
+const GlassCard = styled(Card)(({ theme }) => ({
+  borderRadius: 20,
+  backdropFilter: 'blur(10px)',
+  overflow: 'hidden',
+  transition: 'boxShadow 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  position: 'relative', // Fixed position
+}));
+
+const ProfessionalButton = styled(Button)(
+  ({ theme, variant, color = 'primary' }) => ({
+    borderRadius: 12,
+    fontWeight: 600,
+    padding: '12px 24px',
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    textTransform: 'none',
+    fontSize: '0.95rem',
+    letterSpacing: '0.025em',
+    boxShadow:
+      variant === 'contained' ? '0 4px 14px rgba(254, 249, 225, 0.25)' : 'none',
+    '&:hover': {
+      transform: 'translateY(-2px)',
+      boxShadow:
+        variant === 'contained'
+          ? '0 6px 20px rgba(254, 249, 225, 0.35)'
+          : 'none',
+    },
+    '&:active': {
+      transform: 'translateY(0)',
+    },
+  })
+);
+
+const ModernTextField = styled(TextField)(({ theme }) => ({
+  '& .MuiOutlinedInput-root': {
+    borderRadius: 12,
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    },
+    '&.Mui-focused': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 20px rgba(254, 249, 225, 0.25)',
+      backgroundColor: 'rgba(255, 255, 255, 1)',
+    },
+  },
+  '& .MuiInputLabel-root': {
+    fontWeight: 500,
+  },
+}));
+
+const PremiumTableContainer = styled(TableContainer)(({ theme }) => ({
+  borderRadius: 16,
+  overflow: 'hidden',
+  boxShadow: '0 4px 24px rgba(109, 35, 35, 0.06)',
+  border: '1px solid rgba(109, 35, 35, 0.08)',
+}));
+
+const PremiumTableCell = styled(TableCell)(({ theme, isHeader = false }) => ({
+  fontWeight: isHeader ? 600 : 500,
+  padding: '18px 20px',
+  borderBottom: isHeader
+    ? '2px solid rgba(254, 249, 225, 0.5)'
+    : '1px solid rgba(109, 35, 35, 0.06)',
+  fontSize: '0.95rem',
+  letterSpacing: '0.025em',
+}));
+
+// Excel-like table cell styling
+const ExcelCell = styled(TableCell)(
+  ({ theme, isHeader = false, isSelected = false, isHighlighted = false }) => ({
+    border: '1px solid #D0D0D0',
+    padding: '8px',
+    backgroundColor: isHeader
+      ? '#F0F0F0'
+      : isSelected
+      ? '#E6F7FF'
+      : isHighlighted
+      ? '#FFEB3B'
+      : '#FFFFFF', // Bright yellow for better visibility
+    fontWeight: isHeader ? 'bold' : isHighlighted ? 'bold' : 'normal',
+    whiteSpace: 'nowrap',
+    fontSize: '0.85rem',
+    fontFamily: 'Arial, sans-serif',
+    position: 'relative',
+    transition: 'background-color 0.2s ease',
+    '&:hover': {
+      backgroundColor: isHeader
+        ? '#F0F0F0'
+        : isHighlighted
+        ? '#FFEB3B'
+        : '#F5F5F5',
+      cursor: 'pointer',
+    },
+    '&:after': {
+      content: '""',
+      position: 'absolute',
+      right: 0,
+      top: 0,
+      bottom: 0,
+      width: '1px',
+      backgroundColor: '#D0D0D0',
+    },
+    '&:before': {
+      content: '""',
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: '1px',
+      backgroundColor: '#D0D0D0',
+    },
+  })
+);
 
 // Custom styled TableCell for Excel-like appearance
 const ExcelTableCell = ({ children, header, ...props }) => (
@@ -92,6 +235,31 @@ const ExcelTableCell = ({ children, header, ...props }) => (
 );
 
 const PayrollProcess = () => {
+  // System Settings Hook
+  const { settings } = useSystemSettings();
+
+  // Get colors from system settings - aligned with Remittances.jsx
+  const primaryColor = settings.accentColor || '#FEF9E1'; // Cards color
+  const secondaryColor = settings.backgroundColor || '#FFF8E7'; // Background
+  const accentColor = settings.primaryColor || '#6d2323'; // Primary accent
+  const accentDark = settings.secondaryColor || '#8B3333'; // Darker accent
+  const textPrimaryColor = settings.textPrimaryColor || '#6d2323';
+  const textSecondaryColor = settings.textSecondaryColor || '#FEF9E1';
+  const hoverColor = settings.hoverColor || '#6D2323';
+  const blackColor = '#1a1a1a';
+  const whiteColor = '#FFFFFF';
+  const grayColor = '#6c757d';
+
+  //ACCESSING
+  // Dynamic page access control using component identifier
+  // The identifier 'payroll-table' should match the component_identifier in the pages table
+  const {
+    hasAccess,
+    loading: accessLoading,
+    error: accessError,
+  } = usePageAccess('payroll-table');
+  // ACCESSING END
+
   // [All existing state variables remain the same]
   const [data, setData] = useState([]);
   const [error, setError] = useState('');
@@ -106,6 +274,7 @@ const PayrollProcess = () => {
   const [duplicateEmployeeNumbers, setDuplicateEmployeeNumbers] = useState([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmChecked, setConfirmChecked] = useState(false);
   const [selectedRows, setSelectedRows] = useState([]);
   const [searchTimeout, setSearchTimeout] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -126,6 +295,14 @@ const PayrollProcess = () => {
     totalGrossSalary: 0,
     totalNetSalary: 0,
   });
+
+  // New state for Excel modal
+  const [openExcelModal, setOpenExcelModal] = useState(false);
+  const [excelZoom, setExcelZoom] = useState(1);
+  const [selectedCell, setSelectedCell] = useState({ row: null, col: null });
+  const [highlightedCells, setHighlightedCells] = useState([]);
+  const [searchInExcel, setSearchInExcel] = useState('');
+  const excelTableRef = useRef(null);
 
   // [All existing functions remain the same]
   const handleView = (rowId) => {
@@ -276,17 +453,17 @@ const PayrollProcess = () => {
       const processedCount = allData.filter(
         (item) => item.status === 'Processed' || item.status === 1
       ).length;
-      
+
       const totalGross = allData.reduce(
         (sum, item) => sum + parseFloat(item.grossSalary || 0),
         0
       );
-      
+
       const totalNet = allData.reduce(
         (sum, item) => sum + parseFloat(item.netSalary || 0),
         0
       );
-      
+
       setSummaryData({
         totalEmployees: allData.length,
         processedEmployees: processedCount,
@@ -1005,1034 +1182,3564 @@ const PayrollProcess = () => {
     };
   });
 
-  return (
-    <Container maxWidth={false} sx={{ px: 2, py: 3 }}>
-      {/* Header with Summary */}
-      <Paper elevation={3} sx={{ mb: 3, borderRadius: 2, overflow: 'hidden' }}>
-        <Box sx={{ bgcolor: '#6D2323', p: 2, color: 'white' }}>
-          <Box display="flex" alignItems="center" gap={2}>
-            <Payment fontSize="large" />
-            <Box>
-              <Typography variant="h5" fontWeight="bold">
-                Payroll Processing
-              </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                Manage and process employee payroll records
-              </Typography>
-            </Box>
-          </Box>
-        </Box>
-        
-        {/* Summary Cards */}
-        <Box sx={{ p: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-          <Card sx={{ minWidth: 180, flex: 1, border: '1px solid #e0e0e0' }}>
-            <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-              <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography variant="caption" color="textSecondary">
-                    Total Employees
-                  </Typography>
-                  <Typography variant="h6" fontWeight="bold">
-                    {summaryData.totalEmployees}
-                  </Typography>
-                </Box>
-                <PeopleIcon color="primary" />
-              </Box>
-            </CardContent>
-          </Card>
-          
-          <Card sx={{ minWidth: 180, flex: 1, border: '1px solid #e0e0e0' }}>
-            <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-              <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography variant="caption" color="textSecondary">
-                    Processed
-                  </Typography>
-                  <Typography variant="h6" fontWeight="bold" color="success.main">
-                    {summaryData.processedEmployees}
-                  </Typography>
-                </Box>
-                <CheckCircleIcon color="success" />
-              </Box>
-            </CardContent>
-          </Card>
-          
-          <Card sx={{ minWidth: 180, flex: 1, border: '1px solid #e0e0e0' }}>
-            <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-              <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography variant="caption" color="textSecondary">
-                    Unprocessed
-                  </Typography>
-                  <Typography variant="h6" fontWeight="bold" color="warning.main">
-                    {summaryData.unprocessedEmployees}
-                  </Typography>
-                </Box>
-                <PendingIcon color="warning" />
-              </Box>
-            </CardContent>
-          </Card>
-          
-          <Card sx={{ minWidth: 180, flex: 1, border: '1px solid #e0e0e0' }}>
-            <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-              <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Box>
-                  <Typography variant="caption" color="textSecondary">
-                    Total Net Salary
-                  </Typography>
-                  <Typography variant="h6" fontWeight="bold">
-                    ₱{summaryData.totalNetSalary.toLocaleString('en-US', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </Typography>
-                </Box>
-                <TrendingUpIcon color="info" />
-              </Box>
-            </CardContent>
-          </Card>
-        </Box>
-      </Paper>
+  // New functions for Excel modal
+  const handleCellClick = (rowIndex, colIndex) => {
+    setSelectedCell({ row: rowIndex, col: colIndex });
+  };
 
-      {/* Filters Section */}
-      <Paper elevation={1} sx={{ p: 2, mb: 2, borderRadius: 2 }}>
-        <Box display="flex" alignItems="center" gap={1} mb={2}>
-          <FilterList fontSize="small" />
-          <Typography variant="subtitle2" fontWeight="bold">
-            FILTERS
-          </Typography>
-        </Box>
-        
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} sm={6} md={2.4}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Department</InputLabel>
-              <Select
-                value={selectedDepartment}
-                onChange={handleDepartmentChange}
-                label="Department"
-              >
-                <MenuItem value="">
-                  <em>All Departments</em>
-                </MenuItem>
-                {departments.map((dept) => (
-                  <MenuItem key={dept.id} value={dept.code}>
-                    {dept.description}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={2.4}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Status</InputLabel>
-              <Select
-                value={selectedStatus}
-                onChange={handleStatusChange}
-                label="Status"
-              >
-                <MenuItem value="">
-                  <em>All Status</em>
-                </MenuItem>
-                <MenuItem value="Processed">Processed</MenuItem>
-                <MenuItem value="Unprocessed">Unprocessed</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={2.4}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Month</InputLabel>
-              <Select
-                value={selectedMonth}
-                onChange={handleMonthChange}
-                label="Month"
-              >
-                {monthOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={2.4}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Year</InputLabel>
-              <Select
-                value={selectedYear}
-                onChange={handleYearChange}
-                label="Year"
-              >
-                {yearOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          
-          <Grid item xs={12} sm={6} md={2.4}>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder="Search employee..."
-              value={searchTerm}
-              onChange={handleSearchChange}
-              disabled={isSearching}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon fontSize="small" />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Grid>
-        </Grid>
-      </Paper>
+  const handleZoomIn = () => {
+    setExcelZoom((prev) => Math.min(prev + 0.1, 2));
+  };
 
-      {/* Alerts */}
-      {duplicateEmployeeNumbers.length > 0 && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          Duplicate employee number(s) found: {duplicateEmployeeNumbers.join(', ')}
-        </Alert>
-      )}
-      
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+  const handleZoomOut = () => {
+    setExcelZoom((prev) => Math.max(prev - 0.1, 0.5));
+  };
 
-      {/* Table Section with Fixed Actions */}
-      <Paper elevation={3} sx={{ borderRadius: 2, overflow: 'hidden' }}>
-        {/* Table Header */}
-        <Box sx={{ bgcolor: '#f5f5f5', p: 2, borderBottom: '1px solid #e0e0e0' }}>
-          <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Typography variant="h6" fontWeight="bold">
-              Payroll Records
-            </Typography>
-            <Box display="flex" gap={1}>
-              <Badge badgeContent={selectedRows.length} color="primary">
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<Refresh />}
-                  onClick={() => fetchPayrollData()}
-                >
-                  Refresh
-                </Button>
-              </Badge>
-            </Box>
-          </Box>
-        </Box>
+  // Filter rows for Excel view based on search
+  const getFilteredExcelRows = () => {
+    if (!searchInExcel || !searchInExcel.trim()) {
+      return computedRows;
+    }
 
-        {/* Table with Fixed Actions Column */}
-        <Box sx={{ display: 'flex', overflow: 'hidden' }}>
-          {/* Scrollable Table Content */}
-          <Box sx={{ overflowX: 'auto', flex: 1 }}>
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell padding="checkbox">
-                      <Checkbox
-                        sx={{
-                          color: 'white',
-                          '&.Mui-checked': {
-                            color: 'white',
-                          },
-                          '&:hover': {
-                            color: '#F5F5F5',
-                          },
-                          '&.MuiCheckbox-indeterminate': {
-                            color: 'white',
-                          },
-                        }}
-                        indeterminate={
-                          selectedRows.length > 0 &&
-                          selectedRows.length <
-                            computedRows.filter(
-                              (row) =>
-                                !finalizedPayroll.some(
-                                  (fp) =>
-                                    fp.employeeNumber === row.employeeNumber &&
-                                    fp.startDate === row.startDate &&
-                                    fp.endDate === row.endDate
-                                )
-                            ).length
-                        }
-                        checked={
-                          selectedRows.length ===
-                          computedRows.filter(
-                            (row) =>
-                              !finalizedPayroll.some(
-                                (fp) =>
-                                  fp.employeeNumber === row.employeeNumber &&
-                                  fp.startDate === row.startDate &&
-                                  fp.endDate === row.endDate
-                              )
-                          ).length
-                        }
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedRows(
-                              computedRows
-                                .filter(
-                                  (row) =>
-                                    !finalizedPayroll.some(
-                                      (fp) =>
-                                        fp.employeeNumber === row.employeeNumber &&
-                                        fp.startDate === row.startDate &&
-                                        fp.endDate === row.endDate
-                                    )
-                                )
-                                .map((row) => row.employeeNumber)
-                            );
-                          } else {
-                            setSelectedRows([]);
-                          }
-                        }}
-                      />
-                    </TableCell>
+    const searchTerm = searchInExcel.toLowerCase().trim();
+    return computedRows.filter((row) => {
+      // Search through all relevant fields
+      const searchableText = [
+        row.department,
+        row.employeeNumber,
+        row.startDate,
+        row.endDate,
+        row.name,
+        row.position,
+        row.rateNbc594,
+        row.nbcDiffl597,
+        row.increment,
+        row.grossSalary,
+        row.abs,
+        row.h,
+        row.m,
+        row.netSalary,
+        row.withholdingTax,
+        row.totalGsisDeds,
+        row.totalPagibigDeds,
+        row.PhilHealthContribution,
+        row.totalOtherDeds,
+        row.totalDeductions,
+        row.pay1st,
+        row.pay2nd,
+      ]
+        .join(' ')
+        .toLowerCase();
 
-                    <ExcelTableCell header>No.</ExcelTableCell>
-                    <ExcelTableCell header>View</ExcelTableCell>
-                    <ExcelTableCell header>Department</ExcelTableCell>
-                    <ExcelTableCell header>Employee Number</ExcelTableCell>
-                    <ExcelTableCell header>Start Date</ExcelTableCell>
-                    <ExcelTableCell header>End Date</ExcelTableCell>
-                    <ExcelTableCell header>Name</ExcelTableCell>
-                    <ExcelTableCell header>Position</ExcelTableCell>
-                    <ExcelTableCell header>Rate NBC 594</ExcelTableCell>
-                    <ExcelTableCell header>NBC DIFF'L 597</ExcelTableCell>
-                    <ExcelTableCell header>Increment</ExcelTableCell>
-                    <ExcelTableCell header>Gross Salary</ExcelTableCell>
-                    <ExcelTableCell header>
-                      <b>ABS</b>
-                    </ExcelTableCell>
-                    <ExcelTableCell header>H</ExcelTableCell>
-                    <ExcelTableCell header>M</ExcelTableCell>
-                    <ExcelTableCell header>Net Salary</ExcelTableCell>
-                    <ExcelTableCell header>Withholding Tax</ExcelTableCell>
-                    <ExcelTableCell header>
-                      <b>Total GSIS Deductions</b>
-                    </ExcelTableCell>
-                    <ExcelTableCell header>
-                      <b>Total Pag-ibig Deductions</b>
-                    </ExcelTableCell>
-                    <ExcelTableCell header>PhilHealth</ExcelTableCell>
-                    <ExcelTableCell header>
-                      <b>Total Other Deductions</b>
-                    </ExcelTableCell>
-                    <ExcelTableCell header>
-                      <b>Total Deductions</b>
-                    </ExcelTableCell>
-                    <ExcelTableCell header>1st Pay</ExcelTableCell>
-                    <ExcelTableCell header>2nd Pay</ExcelTableCell>
-                    <ExcelTableCell header>No.</ExcelTableCell>
-                    <ExcelTableCell header>RT Ins.</ExcelTableCell>
-                    <ExcelTableCell header>EC</ExcelTableCell>
-                    <ExcelTableCell header>PhilHealth</ExcelTableCell>
-                    <ExcelTableCell header>Pag-Ibig</ExcelTableCell>
-                    <ExcelTableCell
-                      header
-                      style={{ borderLeft: '2px solid black' }}
-                    >
-                      Pay1st Compute
-                    </ExcelTableCell>
-                    <ExcelTableCell header>Pay2nd Compute</ExcelTableCell>
-                    <ExcelTableCell
-                      header
-                      style={{ borderLeft: '2px solid black' }}
-                    >
-                      No.
-                    </ExcelTableCell>
-                    <ExcelTableCell header>Name</ExcelTableCell>
-                    <ExcelTableCell>Position</ExcelTableCell>
-                    <ExcelTableCell>Withholding Tax</ExcelTableCell>
-                    <ExcelTableCell>Personal Life Ret Ins</ExcelTableCell>
-                    <ExcelTableCell>GSIS Salary Loan</ExcelTableCell>
-                    <ExcelTableCell>GSIS Policy Loan</ExcelTableCell>
-                    <ExcelTableCell>gsisArrears</ExcelTableCell>
-                    <ExcelTableCell>CPL</ExcelTableCell>
-                    <ExcelTableCell>MPL</ExcelTableCell>
-                    <ExcelTableCell> EAL</ExcelTableCell>
-                    <ExcelTableCell>MPL LITE</ExcelTableCell>
-                    <ExcelTableCell>Emergency Loan (ELA)</ExcelTableCell>
-                    <ExcelTableCell>Total GSIS Deductions</ExcelTableCell>
-                    <ExcelTableCell>
-                      Pag-ibig Fund Contribution
-                    </ExcelTableCell>
-                    <ExcelTableCell>Pag-ibig 2</ExcelTableCell>
-                    <ExcelTableCell>Multi-Purpose Loan</ExcelTableCell>
-                    <ExcelTableCell>Total Pag-Ibig Deduction</ExcelTableCell>
-                    <ExcelTableCell> PhilHealth</ExcelTableCell>
-                    <ExcelTableCell> liquidatingCash</ExcelTableCell>
-                    <ExcelTableCell>LandBank Salary Loan</ExcelTableCell>
-                    <ExcelTableCell> Earist Credit COOP.</ExcelTableCell>
-                    <ExcelTableCell> FEU</ExcelTableCell>
-                    <ExcelTableCell> Total Other Deductions</ExcelTableCell>
-                    <ExcelTableCell> Total Deductions</ExcelTableCell>
-                    <ExcelTableCell header>Status</ExcelTableCell>
-                  </TableRow>
-                </TableHead>
+      return searchableText.includes(searchTerm);
+    });
+  };
 
-                <TableBody>
-                  {filteredData.length > 0 ? (
-                    computedRows
-                      .slice(
-                        page * rowsPerPage,
-                        page * rowsPerPage + rowsPerPage
-                      )
-                      .map((row, index) => {
-                        const isFinalized = finalizedPayroll.some(
-                          (fp) =>
-                            fp.employeeNumber === row.employeeNumber &&
-                            fp.startDate === row.startDate &&
-                            fp.endDate === row.endDate
-                        );
+  const handleSearchInExcel = () => {
+    if (!searchInExcel || !searchInExcel.trim()) {
+      setHighlightedCells([]);
+      return;
+    }
 
-                        return (
-                          <TableRow
-                            key={`${row.employeeNumber}-${row.dateCreated}`}
-                            sx={{
-                              '&:hover': {
-                                backgroundColor: '#F5F5F5 !important',
-                              },
-                              backgroundColor: duplicateEmployeeNumbers.includes(
-                                row.employeeNumber
-                              )
-                                ? 'rgba(255, 0, 0, 0.1)'
-                                : 'inherit',
-                            }}
-                          >
-                            <TableCell padding="checkbox">
-                              <Checkbox
-                                checked={selectedRows.includes(
-                                  row.employeeNumber
-                                )}
-                                onChange={() => {
-                                  if (
-                                    selectedRows.includes(row.employeeNumber)
-                                  ) {
-                                    setSelectedRows((prev) =>
-                                      prev.filter(
-                                        (id) => id !== row.employeeNumber
-                                      )
-                                    );
-                                  } else {
-                                    setSelectedRows((prev) => [
-                                      ...prev,
-                                      row.employeeNumber,
-                                    ]);
-                                  }
-                                }}
-                                disabled={isFinalized}
-                              />
-                            </TableCell>
+    const searchTerm = searchInExcel.toLowerCase().trim();
+    const filteredRows = getFilteredExcelRows();
+    const newHighlightedCells = [];
 
-                            <ExcelTableCell>
-                              {page * rowsPerPage + index + 1}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              <Button
-                                onClick={() => handleView(row.id)}
-                                variant="contained"
-                                size="small"
-                                sx={{
-                                  bgcolor: '#ffffff',
-                                  color: '#FFFFFF',
-                                  minWidth: '80px',
-                                  border: '1px solid #6d2323',
-                                  width: '32px',
-                                  height: '32px',
-                                  padding: 0,
-                                  '&:hover': {
-                                    bgcolor: '#6d2323',
-                                    color: 'white',
-                                  },
-                                }}
-                                title="View Record"
-                              >
-                                <Visibility fontSize="small" />
-                                View
-                              </Button>
-                            </ExcelTableCell>
-                            <ExcelTableCell>{row.department}</ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.employeeNumber}
-                            </ExcelTableCell>
-                            <ExcelTableCell>{row.startDate}</ExcelTableCell>
-                            <ExcelTableCell>{row.endDate}</ExcelTableCell>
-                            <ExcelTableCell>{row.name}</ExcelTableCell>
-                            <ExcelTableCell>{row.position}</ExcelTableCell>
+    // Find original indices of filtered rows
+    const filteredRowIndices = new Set(
+      filteredRows.map((filteredRow) =>
+        computedRows.findIndex(
+          (r) =>
+            r.employeeNumber === filteredRow.employeeNumber &&
+            r.startDate === filteredRow.startDate &&
+            r.endDate === filteredRow.endDate
+        )
+      )
+    );
 
-                            <ExcelTableCell>
-                              {row.rateNbc594
-                                ? Number(row.rateNbc594).toLocaleString(
-                                    'en-US',
-                                    {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    }
-                                  )
-                                : ''}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.nbcDiffl597
-                                ? Number(row.nbcDiffl597).toLocaleString(
-                                    'en-US',
-                                    {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    }
-                                  )
-                                : ''}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.increment
-                                ? Number(row.increment).toLocaleString(
-                                    'en-US',
-                                    {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    }
-                                  )
-                                : ''}
-                            </ExcelTableCell>
-                            <ExcelTableCell>{row.grossSalary}</ExcelTableCell>
-                            <ExcelTableCell>
-                              <b>{row.abs}</b>
-                            </ExcelTableCell>
-                            <ExcelTableCell>{row.h}</ExcelTableCell>
-                            <ExcelTableCell>{row.m}</ExcelTableCell>
-                            <ExcelTableCell>{row.netSalary}</ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.withholdingTax}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.totalGsisDeds}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.totalPagibigDeds}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.PhilHealthContribution}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.totalOtherDeds}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.totalDeductions}
-                            </ExcelTableCell>
-                            <ExcelTableCell
-                              sx={{ color: 'red', fontWeight: 'bold' }}
-                            >
-                              {row.pay1st}
-                            </ExcelTableCell>
-                            <ExcelTableCell
-                              sx={{ color: 'red', fontWeight: 'bold' }}
-                            >
-                              {row.pay2nd}
-                            </ExcelTableCell>
-                            <ExcelTableCell>{index + 1}</ExcelTableCell>
-                            <ExcelTableCell>{row.rtIns}</ExcelTableCell>
-                            <ExcelTableCell>{row.ec}</ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.PhilHealthContribution}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.pagibigFundCont}
-                            </ExcelTableCell>
-                            <ExcelTableCell
-                              sx={{
-                                borderLeft: '2px solid black',
-                                color: 'red',
-                                fontWeight: 'bold',
-                              }}
-                            >
-                              {row.pay1stCompute}
-                            </ExcelTableCell>
-                            <ExcelTableCell
-                              sx={{ color: 'red', fontWeight: 'bold' }}
-                            >
-                              {row.pay2ndCompute}
-                            </ExcelTableCell>
-                            <ExcelTableCell
-                              sx={{ borderLeft: '2px solid black' }}
-                            >
-                              {index + 1}
-                            </ExcelTableCell>
-                            <ExcelTableCell>{row.name}</ExcelTableCell>
-                            <ExcelTableCell>{row.position}</ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.withholdingTax
-                                ? Number(row.withholdingTax).toLocaleString(
-                                    'en-US',
-                                    {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    }
-                                  )
-                                : ''}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.personalLifeRetIns}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.gsisSalaryLoan
-                                ? Number(row.gsisSalaryLoan).toLocaleString(
-                                    'en-US',
-                                    {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    }
-                                  )
-                                : ''}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.gsisPolicyLoan
-                                ? Number(row.gsisPolicyLoan).toLocaleString(
-                                    'en-US',
-                                    {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    }
-                                  )
-                                : ''}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.gsisArrears
-                                ? Number(row.gsisArrears).toLocaleString(
-                                    'en-US',
-                                    {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    }
-                                  )
-                                : ''}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.cpl
-                                ? Number(row.cpl).toLocaleString('en-US', {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })
-                                : ''}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.mpl
-                                ? Number(row.mpl).toLocaleString('en-US', {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })
-                                : ''}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.eal
-                                ? Number(row.eal).toLocaleString('en-US', {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })
-                                : ''}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.mplLite
-                                ? Number(row.mplLite).toLocaleString(
-                                    'en-US',
-                                    {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    }
-                                  )
-                                : ''}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.emergencyLoan
-                                ? Number(row.emergencyLoan).toLocaleString(
-                                    'en-US',
-                                    {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    }
-                                  )
-                                : ''}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.totalGsisDeds}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.pagibigFundCont
-                                ? Number(row.pagibigFundCont).toLocaleString(
-                                    'en-US',
-                                    {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    }
-                                  )
-                                : ''}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.pagibig2
-                                ? Number(row.pagibig2).toLocaleString(
-                                    'en-US',
-                                    {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    }
-                                  )
-                                : ''}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.multiPurpLoan
-                                ? Number(row.multiPurpLoan).toLocaleString(
-                                    'en-US',
-                                    {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    }
-                                  )
-                                : ''}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.totalPagibigDeds}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.PhilHealthContribution}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.liquidatingCash
-                                ? Number(row.liquidatingCash).toLocaleString(
-                                    'en-US',
-                                    {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    }
-                                  )
-                                : ''}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.landbankSalaryLoan
-                                ? Number(
-                                    row.landbankSalaryLoan
-                                  ).toLocaleString('en-US', {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })
-                                : ''}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.earistCreditCoop
-                                ? Number(row.earistCreditCoop).toLocaleString(
-                                    'en-US',
-                                    {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    }
-                                  )
-                                : ''}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.feu
-                                ? Number(row.feu).toLocaleString('en-US', {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })
-                                : ''}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.totalOtherDeds}
-                            </ExcelTableCell>
-                            <ExcelTableCell>
-                              {row.totalDeductions}
-                            </ExcelTableCell>
-                            <ExcelTableCell
-                              sx={{
-                                fontWeight: 'bold',
-                                color:
-                                  row.status === 'Processed'
-                                    ? 'green'
-                                    : 'red',
-                              }}
-                            >
-                              <Chip
-                                label={row.status}
-                                color={row.status === 'Processed' ? 'success' : 'warning'}
-                                size="small"
-                              />
-                            </ExcelTableCell>
-                          </TableRow>
-                        );
-                      })
-                  ) : (
-                    <TableRow>
-                      <ExcelTableCell colSpan={50} align="center">
-                        No payroll records available.
-                      </ExcelTableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Box>
+    // Highlight cells in filtered rows
+    filteredRows.forEach((row, displayIndex) => {
+      const originalIndex = computedRows.findIndex(
+        (r) =>
+          r.employeeNumber === row.employeeNumber &&
+          r.startDate === row.startDate &&
+          r.endDate === row.endDate
+      );
 
-          {/* Fixed Actions Column */}
-          <Box
-            sx={{
-              width: '120px',
-              minWidth: '120px',
-              borderLeft: '2px solid #e0e0e0',
-              backgroundColor: '#f9f9f9',
-              position: 'sticky',
-              right: 0,
-              zIndex: 1,
-              boxShadow: '-2px 0 5px rgba(0,0,0,0.1)',
-            }}
-          >
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell
-                    sx={{
-                      backgroundColor: '#F5F5F5',
-                      fontWeight: 'bold',
-                      textAlign: 'center',
-                      borderBottom: '1px solid #E0E0E0',
-                      padding: '8px',
-                      position: 'sticky',
-                      top: 0,
-                      zIndex: 2,
-                    }}
-                  >
-                    Actions
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredData.length > 0 ? (
-                  computedRows
-                    .slice(
-                      page * rowsPerPage,
-                      page * rowsPerPage + rowsPerPage
-                    )
-                    .map((row, index) => {
-                      const isFinalized = finalizedPayroll.some(
-                        (fp) =>
-                          fp.employeeNumber === row.employeeNumber &&
-                          fp.startDate === row.startDate &&
-                          fp.endDate === row.endDate
-                      );
+      // Map columns to their actual indices in the table
+      const columnData = [
+        { value: displayIndex + 1, colIndex: 0 }, // No. (display index)
+        { value: '', colIndex: 1 }, // View (skip)
+        { value: row.department, colIndex: 2 },
+        { value: row.employeeNumber, colIndex: 3 },
+        { value: row.startDate, colIndex: 4 },
+        { value: row.endDate, colIndex: 5 },
+        { value: row.name, colIndex: 6 },
+        { value: row.position, colIndex: 7 },
+        { value: row.rateNbc594, colIndex: 8 },
+        { value: row.nbcDiffl597, colIndex: 9 },
+        { value: row.increment, colIndex: 10 },
+        { value: row.grossSalary, colIndex: 11 },
+        { value: row.abs, colIndex: 12 },
+        { value: row.h, colIndex: 13 },
+        { value: row.m, colIndex: 14 },
+        { value: row.netSalary, colIndex: 15 },
+        { value: row.withholdingTax, colIndex: 16 },
+        { value: row.totalGsisDeds, colIndex: 17 },
+        { value: row.totalPagibigDeds, colIndex: 18 },
+        { value: row.PhilHealthContribution, colIndex: 19 },
+        { value: row.totalOtherDeds, colIndex: 20 },
+        { value: row.totalDeductions, colIndex: 21 },
+        { value: row.pay1st, colIndex: 22 },
+        { value: row.pay2nd, colIndex: 23 },
+      ];
 
-                      return (
-                        <TableRow
-                          key={`actions-${row.employeeNumber}-${row.dateCreated}`}
-                          sx={{
-                            '&:hover': {
-                              backgroundColor: '#F5F5F5 !important',
-                            },
-                            backgroundColor: duplicateEmployeeNumbers.includes(
-                              row.employeeNumber
-                            )
-                              ? 'rgba(255, 0, 0, 0.1)'
-                              : 'inherit',
-                            height: '53px',
-                          }}
-                        >
-                          <TableCell
-                            sx={{
-                              padding: '8px',
-                              textAlign: 'center',
-                              borderBottom: '1px solid #E0E0E0',
-                            }}
-                          >
-                            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
-                              <Tooltip title="Edit Record">
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleEdit(row.id)}
-                                  disabled={isFinalized}
-                                  sx={{
-                                    color: isFinalized ? '#ccc' : '#6d2323',
-                                    backgroundColor: isFinalized ? '#f5f5f5' : 'white',
-                                    border: '1px solid #6d2323',
-                                    '&:hover': {
-                                      backgroundColor: isFinalized ? '#f5f5f5' : 'rgba(109, 35, 35, 0.1)',
-                                    },
-                                    padding: '4px',
-                                  }}
-                                >
-                                  <EditIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="Delete Record">
-                                <IconButton
-                                  size="small"
-                                  onClick={() =>
-                                    handleDelete(row.id, row.employeeNumber)
-                                  }
-                                  disabled={isFinalized}
-                                  sx={{
-                                    color: isFinalized ? '#ccc' : '#d32f2f',
-                                    backgroundColor: isFinalized ? '#f5f5f5' : 'white',
-                                    border: '1px solid #d32f2f',
-                                    '&:hover': {
-                                      backgroundColor: isFinalized ? '#f5f5f5' : 'rgba(211, 47, 47, 0.1)',
-                                    },
-                                    padding: '4px',
-                                  }}
-                                >
-                                  <DeleteIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            </Box>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      sx={{
-                        textAlign: 'center',
-                        borderBottom: '1px solid #E0E0E0',
-                        padding: '8px',
-                      }}
-                    >
-                      No actions
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </Box>
-        </Box>
+      columnData.forEach(({ value, colIndex }) => {
+        if (value && value.toString().toLowerCase().includes(searchTerm)) {
+          newHighlightedCells.push({ row: displayIndex, col: colIndex });
+        }
+      });
+    });
 
-        {/* Table Footer */}
+    setHighlightedCells(newHighlightedCells);
+  };
+
+  const isCellHighlighted = (rowIndex, colIndex) => {
+    return highlightedCells.some(
+      (cell) => cell.row === rowIndex && cell.col === colIndex
+    );
+  };
+
+  const isCellSelected = (rowIndex, colIndex) => {
+    return selectedCell.row === rowIndex && selectedCell.col === colIndex;
+  };
+
+  // Export to Excel function
+  const handleExportToExcel = () => {
+    if (computedRows.length === 0) {
+      alert('No data to export.');
+      return;
+    }
+
+    // Get the month from the first record's startDate
+    const getMonthName = (dateString) => {
+      if (!dateString) return 'Unknown';
+      const date = new Date(dateString);
+      const months = [
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
+      ];
+      return months[date.getMonth()];
+    };
+
+    const getYear = (dateString) => {
+      if (!dateString) return new Date().getFullYear();
+      return new Date(dateString).getFullYear();
+    };
+
+    const monthName = getMonthName(computedRows[0]?.startDate);
+    const year = getYear(computedRows[0]?.startDate);
+
+    // Helper function to convert formatted string to number
+    const toNumber = (value) => {
+      if (value === null || value === undefined || value === '') return '';
+      // Remove formatting (commas, currency symbols)
+      const cleaned = String(value).replace(/[₱,\s]/g, '');
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? value : num;
+    };
+
+    // Prepare headers
+    const headers = [
+      'No.',
+      'Department',
+      'Employee Number',
+      'Start Date',
+      'End Date',
+      'Name',
+      'Position',
+      'Rate NBC 594',
+      "NBC DIFF'L 597",
+      'Increment',
+      'Gross Salary',
+      'ABS',
+      'H',
+      'M',
+      'Net Salary',
+      'Withholding Tax',
+      'Total GSIS Deductions',
+      'Total Pag-ibig Deductions',
+      'PhilHealth',
+      'Total Other Deductions',
+      'Total Deductions',
+      '1st Pay',
+      '2nd Pay',
+      'RT Ins.',
+      'EC',
+      'Pay1st Compute',
+      'Pay2nd Compute',
+      'Personal Life Ret Ins',
+      'GSIS Salary Loan',
+      'GSIS Policy Loan',
+      'GSIS Arrears',
+      'CPL',
+      'MPL',
+      'EAL',
+      'MPL LITE',
+      'Emergency Loan',
+      'Pag-ibig Fund Contribution',
+      'Pag-ibig 2',
+      'Multi-Purpose Loan',
+      'Liquidating Cash',
+      'LandBank Salary Loan',
+      'Earist Credit COOP.',
+      'FEU',
+      'Status',
+    ];
+
+    // Build Excel data array with title, empty row, headers, and data
+    const excelDataArray = [];
+
+    // Title row (merged across all columns)
+    const title = `Payroll Processing - ${monthName} ${year}`;
+    const titleRow = [title, ...Array(headers.length - 1).fill('')];
+    excelDataArray.push(titleRow);
+
+    // Empty row
+    excelDataArray.push(Array(headers.length).fill(''));
+
+    // Header row
+    excelDataArray.push(headers);
+
+    // Data rows
+    computedRows.forEach((row, index) => {
+      excelDataArray.push([
+        index + 1,
+        row.department || '',
+        row.employeeNumber || '',
+        row.startDate || '',
+        row.endDate || '',
+        row.name || '',
+        row.position || '',
+        toNumber(row.rateNbc594),
+        toNumber(row.nbcDiffl597),
+        toNumber(row.increment),
+        toNumber(row.grossSalary),
+        toNumber(row.abs),
+        row.h || 0,
+        row.m || 0,
+        toNumber(row.netSalary),
+        toNumber(row.withholdingTax),
+        toNumber(row.totalGsisDeds),
+        toNumber(row.totalPagibigDeds),
+        toNumber(row.PhilHealthContribution),
+        toNumber(row.totalOtherDeds),
+        toNumber(row.totalDeductions),
+        toNumber(row.pay1st),
+        toNumber(row.pay2nd),
+        toNumber(row.rtIns),
+        toNumber(row.ec),
+        toNumber(row.pay1stCompute),
+        toNumber(row.pay2ndCompute),
+        toNumber(row.personalLifeRetIns),
+        toNumber(row.gsisSalaryLoan),
+        toNumber(row.gsisPolicyLoan),
+        toNumber(row.gsisArrears),
+        toNumber(row.cpl),
+        toNumber(row.mpl),
+        toNumber(row.eal),
+        toNumber(row.mplLite),
+        toNumber(row.emergencyLoan),
+        toNumber(row.pagibigFundCont),
+        toNumber(row.pagibig2),
+        toNumber(row.multiPurpLoan),
+        toNumber(row.liquidatingCash),
+        toNumber(row.landbankSalaryLoan),
+        toNumber(row.earistCreditCoop),
+        toNumber(row.feu),
+        row.status || '',
+      ]);
+    });
+
+    // Create worksheet from array of arrays
+    const worksheet = XLSX.utils.aoa_to_sheet(excelDataArray);
+    const workbook = XLSX.utils.book_new();
+
+    // Merge cells for title row
+    if (!worksheet['!merges']) worksheet['!merges'] = [];
+    worksheet['!merges'].push({
+      s: { r: 0, c: 0 },
+      e: { r: 0, c: headers.length - 1 },
+    });
+
+    // Set column widths
+    const colWidths = headers.map((header, idx) => {
+      const headerLength = header.length;
+      const titleLength = idx === 0 ? title.length : 0;
+      const dataLengths = computedRows.map((row, rowIdx) => {
+        let value = '';
+        if (idx === 0) value = String(rowIdx + 1);
+        else if (idx === 1) value = String(row.department || '');
+        else if (idx === 2) value = String(row.employeeNumber || '');
+        else if (idx === 3) value = String(row.startDate || '');
+        else if (idx === 4) value = String(row.endDate || '');
+        else if (idx === 5) value = String(row.name || '');
+        else if (idx === 6) value = String(row.position || '');
+        else if (idx === 7) value = String(toNumber(row.rateNbc594) || '');
+        else if (idx === 8) value = String(toNumber(row.nbcDiffl597) || '');
+        else if (idx === 9) value = String(toNumber(row.increment) || '');
+        else if (idx === 10) value = String(toNumber(row.grossSalary) || '');
+        else if (idx === 11) value = String(toNumber(row.abs) || '');
+        else if (idx === 12) value = String(row.h || '');
+        else if (idx === 13) value = String(row.m || '');
+        else if (idx === 14) value = String(toNumber(row.netSalary) || '');
+        else if (idx === 15) value = String(toNumber(row.withholdingTax) || '');
+        else if (idx === 16) value = String(toNumber(row.totalGsisDeds) || '');
+        else if (idx === 17)
+          value = String(toNumber(row.totalPagibigDeds) || '');
+        else if (idx === 18)
+          value = String(toNumber(row.PhilHealthContribution) || '');
+        else if (idx === 19) value = String(toNumber(row.totalOtherDeds) || '');
+        else if (idx === 20)
+          value = String(toNumber(row.totalDeductions) || '');
+        else if (idx === 21) value = String(toNumber(row.pay1st) || '');
+        else if (idx === 22) value = String(toNumber(row.pay2nd) || '');
+        else if (idx === 23) value = String(toNumber(row.rtIns) || '');
+        else if (idx === 24) value = String(toNumber(row.ec) || '');
+        else if (idx === 25) value = String(toNumber(row.pay1stCompute) || '');
+        else if (idx === 26) value = String(toNumber(row.pay2ndCompute) || '');
+        else if (idx === 27)
+          value = String(toNumber(row.personalLifeRetIns) || '');
+        else if (idx === 28) value = String(toNumber(row.gsisSalaryLoan) || '');
+        else if (idx === 29) value = String(toNumber(row.gsisPolicyLoan) || '');
+        else if (idx === 30) value = String(toNumber(row.gsisArrears) || '');
+        else if (idx === 31) value = String(toNumber(row.cpl) || '');
+        else if (idx === 32) value = String(toNumber(row.mpl) || '');
+        else if (idx === 33) value = String(toNumber(row.eal) || '');
+        else if (idx === 34) value = String(toNumber(row.mplLite) || '');
+        else if (idx === 35) value = String(toNumber(row.emergencyLoan) || '');
+        else if (idx === 36)
+          value = String(toNumber(row.pagibigFundCont) || '');
+        else if (idx === 37) value = String(toNumber(row.pagibig2) || '');
+        else if (idx === 38) value = String(toNumber(row.multiPurpLoan) || '');
+        else if (idx === 39)
+          value = String(toNumber(row.liquidatingCash) || '');
+        else if (idx === 40)
+          value = String(toNumber(row.landbankSalaryLoan) || '');
+        else if (idx === 41)
+          value = String(toNumber(row.earistCreditCoop) || '');
+        else if (idx === 42) value = String(toNumber(row.feu) || '');
+        else if (idx === 43) value = String(row.status || '');
+        return value.length;
+      });
+      const maxLength = Math.max(headerLength, titleLength, ...dataLengths);
+      return { wch: Math.min(Math.max(maxLength + 2, 10), 30) };
+    });
+    worksheet['!cols'] = colWidths;
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Payroll Data');
+
+    // Generate filename with month and year
+    const filename = `Payroll_${monthName}_${year}.xlsx`;
+
+    // Export file
+    XLSX.writeFile(workbook, filename);
+
+    // Show success message
+    setSuccessAction('export');
+    setSuccessOpen(true);
+    setTimeout(() => setSuccessOpen(false), 2000);
+  };
+
+  // ACCESSING 2
+  // Loading state
+  if (accessLoading) {
+    return (
+      <Container maxWidth="md" sx={{ py: 8 }}>
         <Box
           sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            borderTop: '1px solid #E0E0E0',
-            px: 2,
-            py: 1,
-            bgcolor: '#f5f5f5',
-          }}
-        >
-          <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-              Total Records: {filteredData.length}
-            </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-              Selected: {selectedRows.length}
-            </Typography>
-          </Box>
-          <TablePagination
-            component="div"
-            count={filteredData.length}
-            page={page}
-            onPageChange={handleChangePage}
-            rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-            rowsPerPageOptions={[10, 25, 50, 100]}
-          />
-        </Box>
-      </Paper>
-
-      {/* Action Buttons */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3, gap: 2 }}>
-        <Button
-          variant="contained"
-          onClick={() => setShowConfirmation(true)}
-          disabled={!canSubmit}
-          size="large"
-          sx={{
-            backgroundColor: '#6d2323',
-            '&:hover': { backgroundColor: '#5a1e1e' },
-            '&:disabled': { backgroundColor: '#ccc', color: '#666' },
-          }}
-          startIcon={<ExitToApp />}
-        >
-          Export Payroll Records ({selectedRows.length})
-        </Button>
-
-        <Button
-          variant="outlined"
-          onClick={() => (window.location.href = '/payroll-processed')}
-          size="large"
-          sx={{
-            borderColor: '#6d2323',
-            color: '#6d2323',
-            '&:hover': { borderColor: '#5a1e1e', backgroundColor: '#f5f5f5' },
-          }}
-          startIcon={<CreditCard />}
-        >
-          View Processed Payroll
-        </Button>
-      </Box>
-
-      {/* [All existing modals remain the same - Edit Modal, View Modal, Confirmation Modal] */}
-      <Modal open={openModal} onClose={handleCancel}>
-        <Box
-          sx={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: '95vw',
-            maxWidth: 1600,
-            height: '90vh',
-            bgcolor: 'background.paper',
-            borderRadius: 2,
-            boxShadow: 24,
             display: 'flex',
             flexDirection: 'column',
-            border: '3px solid #6d2323',
+            alignItems: 'center',
           }}
         >
-          {editRow && (
-            <>
-              {/* Header */}
-              <Box
-                sx={{
-                  p: 3,
-                  bgcolor: '#6d2323',
-                  color: 'white',
-                  borderRadius: '2px 2px 0 0',
-                }}
-              >
-                <Typography variant="h5" fontWeight="bold">
-                  Edit Payroll Record - {editRow.name}
-                </Typography>
-                <Typography
-                  variant="body2"
-                  sx={{ opacity: 0.9, mt: 0.5, fontWeight: 'bold' }}
-                >
-                  Employee Number: {editRow.employeeNumber}
-                </Typography>
-              </Box>
+          <CircularProgress sx={{ color: '#6d2323', mb: 2 }} />
+          <Typography variant="h6" sx={{ color: '#6d2323' }}>
+            Loading access information...
+          </Typography>
+        </Box>
+      </Container>
+    );
+  }
+  // Access denied state - Now using the reusable component
+  if (!accessLoading && hasAccess !== true) {
+    return (
+      <AccessDenied
+        title="Access Denied"
+        message="You do not have permission to access Payroll Processing. Contact your administrator to request access."
+        returnPath="/admin-home"
+        returnButtonText="Return to Home"
+      />
+    );
+  }
+  //ACCESSING END2
 
-              {/* Main Content - Split View */}
+  return (
+    <Box
+      sx={{
+        py: 4,
+        borderRadius: '14px',
+        width: '100vw',
+        mx: 'auto',
+        maxWidth: '100%',
+        overflow: 'hidden',
+        position: 'relative',
+        left: '50%',
+        transform: 'translateX(-50%)',
+      }}
+    >
+      {/* Wider Container */}
+      <Box
+        sx={{
+          px: 6,
+          mx: 'auto',
+          maxWidth: '1600px',
+          width: '100%',
+          overflowX: 'auto',
+        }}
+      >
+        {/* Header */}
+        <Fade in timeout={500}>
+          <Box sx={{ mb: 4 }}>
+            <GlassCard
+              sx={{
+                background: `rgba(${hexToRgb(primaryColor)}, 0.95)`,
+                boxShadow: `0 8px 40px ${alpha(accentColor, 0.08)}`,
+                border: `1px solid ${alpha(accentColor, 0.1)}`,
+                '&:hover': {
+                  boxShadow: `0 12px 48px ${alpha(accentColor, 0.15)}`,
+                },
+              }}
+            >
               <Box
                 sx={{
-                  flex: 1,
-                  display: 'flex',
+                  p: 5,
+                  background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`,
+                  color: textPrimaryColor,
+                  position: 'relative',
                   overflow: 'hidden',
                 }}
               >
-                {/* LEFT SIDE - Original Values (Read-only) */}
+                {/* Decorative elements */}
                 <Box
                   sx={{
-                    width: '50%',
+                    position: 'absolute',
+                    top: -50,
+                    right: -50,
+                    width: 200,
+                    height: 200,
+                    background:
+                      'radial-gradient(circle, rgba(109,35,35,0.1) 0%, rgba(109,35,35,0) 70%)',
+                  }}
+                />
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    bottom: -30,
+                    left: '30%',
+                    width: 150,
+                    height: 150,
+                    background:
+                      'radial-gradient(circle, rgba(109,35,35,0.08) 0%, rgba(109,35,35,0) 70%)',
+                  }}
+                />
+
+                <Box
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  position="relative"
+                  zIndex={1}
+                  mb={3}
+                >
+                  <Box display="flex" alignItems="center">
+                    <Avatar
+                      sx={{
+                        bgcolor: 'rgba(109,35,35,0.15)',
+                        mr: 4,
+                        width: 64,
+                        height: 64,
+                        boxShadow: '0 8px 24px rgba(109,35,35,0.15)',
+                      }}
+                    >
+                      <Payment sx={{ color: textPrimaryColor, fontSize: 32 }} />
+                    </Avatar>
+                    <Box>
+                      <Typography
+                        variant="h4"
+                        component="h1"
+                        sx={{
+                          fontWeight: 700,
+                          mb: 1,
+                          lineHeight: 1.2,
+                          color: textPrimaryColor,
+                        }}
+                      >
+                        Payroll Processing
+                      </Typography>
+                      <Typography
+                        variant="body1"
+                        sx={{
+                          opacity: 0.8,
+                          fontWeight: 400,
+                          color: textPrimaryColor,
+                        }}
+                      >
+                        Manage and process employee payroll records
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Box display="flex" alignItems="center" gap={2}>
+                    <Chip
+                      label="Payroll Management"
+                      size="small"
+                      sx={{
+                        bgcolor: alpha(accentColor, 0.15),
+                        color: textPrimaryColor,
+                        fontWeight: 500,
+                        '& .MuiChip-label': { px: 1 },
+                      }}
+                    />
+                    <Tooltip title="Refresh Data">
+                      <IconButton
+                        onClick={() => fetchPayrollData()}
+                        sx={{
+                          bgcolor: alpha(accentColor, 0.1),
+                          '&:hover': { bgcolor: alpha(accentColor, 0.2) },
+                          color: textPrimaryColor,
+                          width: 48,
+                          height: 48,
+                        }}
+                      >
+                        <Refresh />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                </Box>
+
+                {/* Summary Cards */}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    gap: 2,
+                    flexWrap: 'wrap',
+                    position: 'relative',
+                    zIndex: 1,
+                  }}
+                >
+                  <Card
+                    sx={{
+                      minWidth: 180,
+                      flex: 1,
+                      border: `1px solid ${alpha(accentColor, 0.1)}`,
+                      background: `rgba(${hexToRgb(whiteColor)}, 0.9)`,
+                      boxShadow: `0 4px 16px ${alpha(accentColor, 0.08)}`,
+                      '&:hover': {
+                        boxShadow: `0 6px 20px ${alpha(accentColor, 0.12)}`,
+                        transform: 'translateY(-2px)',
+                      },
+                      transition: 'all 0.3s ease',
+                    }}
+                  >
+                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                      <Box
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="space-between"
+                      >
+                        <Box>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: textPrimaryColor,
+                              opacity: 0.7,
+                              fontWeight: 500,
+                            }}
+                          >
+                            Total Employees
+                          </Typography>
+                          <Typography
+                            variant="h6"
+                            fontWeight="bold"
+                            sx={{ color: textPrimaryColor }}
+                          >
+                            {summaryData.totalEmployees}
+                          </Typography>
+                        </Box>
+                        <PeopleIcon sx={{ color: accentColor, fontSize: 32 }} />
+                      </Box>
+                    </CardContent>
+                  </Card>
+
+                  <Card
+                    sx={{
+                      minWidth: 180,
+                      flex: 1,
+                      border: `1px solid ${alpha(accentColor, 0.1)}`,
+                      background: `rgba(${hexToRgb(whiteColor)}, 0.9)`,
+                      boxShadow: `0 4px 16px ${alpha(accentColor, 0.08)}`,
+                      '&:hover': {
+                        boxShadow: `0 6px 20px ${alpha(accentColor, 0.12)}`,
+                        transform: 'translateY(-2px)',
+                      },
+                      transition: 'all 0.3s ease',
+                    }}
+                  >
+                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                      <Box
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="space-between"
+                      >
+                        <Box>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: textPrimaryColor,
+                              opacity: 0.7,
+                              fontWeight: 500,
+                            }}
+                          >
+                            Processed
+                          </Typography>
+                          <Typography
+                            variant="h6"
+                            fontWeight="bold"
+                            sx={{ color: '#4caf50' }}
+                          >
+                            {summaryData.processedEmployees}
+                          </Typography>
+                        </Box>
+                        <CheckCircleIcon
+                          sx={{ color: '#4caf50', fontSize: 32 }}
+                        />
+                      </Box>
+                    </CardContent>
+                  </Card>
+
+                  <Card
+                    sx={{
+                      minWidth: 180,
+                      flex: 1,
+                      border: `1px solid ${alpha(accentColor, 0.1)}`,
+                      background: `rgba(${hexToRgb(whiteColor)}, 0.9)`,
+                      boxShadow: `0 4px 16px ${alpha(accentColor, 0.08)}`,
+                      '&:hover': {
+                        boxShadow: `0 6px 20px ${alpha(accentColor, 0.12)}`,
+                        transform: 'translateY(-2px)',
+                      },
+                      transition: 'all 0.3s ease',
+                    }}
+                  >
+                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                      <Box
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="space-between"
+                      >
+                        <Box>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: textPrimaryColor,
+                              opacity: 0.7,
+                              fontWeight: 500,
+                            }}
+                          >
+                            Unprocessed
+                          </Typography>
+                          <Typography
+                            variant="h6"
+                            fontWeight="bold"
+                            sx={{ color: '#ff9800' }}
+                          >
+                            {summaryData.unprocessedEmployees}
+                          </Typography>
+                        </Box>
+                        <PendingIcon sx={{ color: '#ff9800', fontSize: 32 }} />
+                      </Box>
+                    </CardContent>
+                  </Card>
+
+                  <Card
+                    sx={{
+                      minWidth: 180,
+                      flex: 1,
+                      border: `1px solid ${alpha(accentColor, 0.1)}`,
+                      background: `rgba(${hexToRgb(whiteColor)}, 0.9)`,
+                      boxShadow: `0 4px 16px ${alpha(accentColor, 0.08)}`,
+                      '&:hover': {
+                        boxShadow: `0 6px 20px ${alpha(accentColor, 0.12)}`,
+                        transform: 'translateY(-2px)',
+                      },
+                      transition: 'all 0.3s ease',
+                    }}
+                  >
+                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                      <Box
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="space-between"
+                      >
+                        <Box>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: textPrimaryColor,
+                              opacity: 0.7,
+                              fontWeight: 500,
+                            }}
+                          >
+                            Total Net Salary
+                          </Typography>
+                          <Typography
+                            variant="h6"
+                            fontWeight="bold"
+                            sx={{ color: textPrimaryColor }}
+                          >
+                            ₱
+                            {summaryData.totalNetSalary.toLocaleString(
+                              'en-US',
+                              {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              }
+                            )}
+                          </Typography>
+                        </Box>
+                        <TrendingUpIcon
+                          sx={{ color: accentColor, fontSize: 32 }}
+                        />
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Box>
+              </Box>
+            </GlassCard>
+          </Box>
+        </Fade>
+
+        {/* Filters Section */}
+        <Fade in timeout={700}>
+          <GlassCard
+            sx={{
+              mb: 4,
+              background: `rgba(${hexToRgb(primaryColor)}, 0.95)`,
+              boxShadow: `0 8px 40px ${alpha(accentColor, 0.08)}`,
+              border: `1px solid ${alpha(accentColor, 0.1)}`,
+              '&:hover': {
+                boxShadow: `0 12px 48px ${alpha(accentColor, 0.15)}`,
+              },
+            }}
+          >
+            <CardContent sx={{ p: 4 }}>
+              <Box
+                display="flex"
+                alignItems="center"
+                justifyContent="space-between"
+                mb={3}
+              >
+                <Box display="flex" alignItems="center" gap={1}>
+                  <FilterList sx={{ color: textPrimaryColor, fontSize: 24 }} />
+                  <Typography
+                    variant="h6"
+                    fontWeight="bold"
+                    sx={{ color: textPrimaryColor }}
+                  >
+                    FILTERS
+                  </Typography>
+                </Box>
+
+                {/* Excel View and Export Buttons */}
+                <Box display="flex" alignItems="center" gap={2}>
+                  <ProfessionalButton
+                    variant="outlined"
+                    size="small"
+                    startIcon={<GridOn />}
+                    onClick={() => setOpenExcelModal(true)}
+                    sx={{
+                      borderColor: accentColor,
+                      color: textPrimaryColor,
+                      '&:hover': {
+                        borderColor: accentDark,
+                        backgroundColor: alpha(accentColor, 0.1),
+                      },
+                    }}
+                  >
+                    Excel View
+                  </ProfessionalButton>
+                  <ProfessionalButton
+                    variant="outlined"
+                    size="small"
+                    startIcon={<GetApp />}
+                    onClick={handleExportToExcel}
+                    disabled={computedRows.length === 0}
+                    sx={{
+                      borderColor: accentColor,
+                      color: textPrimaryColor,
+                      '&:hover': {
+                        borderColor: accentDark,
+                        backgroundColor: alpha(accentColor, 0.1),
+                      },
+                      '&:disabled': {
+                        borderColor: alpha(accentColor, 0.3),
+                        color: alpha(textPrimaryColor, 0.5),
+                      },
+                    }}
+                  >
+                    Save to Excel
+                  </ProfessionalButton>
+                </Box>
+              </Box>
+
+              <Grid container spacing={2} alignItems="center">
+                <Grid item xs={12} sm={6} md={2.4}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ color: textPrimaryColor }}>
+                      Department
+                    </InputLabel>
+                    <Select
+                      value={selectedDepartment}
+                      onChange={handleDepartmentChange}
+                      label="Department"
+                      sx={{
+                        color: textPrimaryColor,
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: alpha(accentColor, 0.3),
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                          borderColor: alpha(accentColor, 0.5),
+                        },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                          borderColor: accentColor,
+                        },
+                      }}
+                    >
+                      <MenuItem value="">
+                        <em>All Departments</em>
+                      </MenuItem>
+                      {departments.map((dept) => (
+                        <MenuItem key={dept.id} value={dept.code}>
+                          {dept.description}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={2.4}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ color: textPrimaryColor }}>
+                      Status
+                    </InputLabel>
+                    <Select
+                      value={selectedStatus}
+                      onChange={handleStatusChange}
+                      label="Status"
+                      sx={{
+                        color: textPrimaryColor,
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: alpha(accentColor, 0.3),
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                          borderColor: alpha(accentColor, 0.5),
+                        },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                          borderColor: accentColor,
+                        },
+                      }}
+                    >
+                      <MenuItem value="">
+                        <em>All Status</em>
+                      </MenuItem>
+                      <MenuItem value="Processed">Processed</MenuItem>
+                      <MenuItem value="Unprocessed">Unprocessed</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={2.4}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ color: textPrimaryColor }}>
+                      Month
+                    </InputLabel>
+                    <Select
+                      value={selectedMonth}
+                      onChange={handleMonthChange}
+                      label="Month"
+                      sx={{
+                        color: textPrimaryColor,
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: alpha(accentColor, 0.3),
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                          borderColor: alpha(accentColor, 0.5),
+                        },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                          borderColor: accentColor,
+                        },
+                      }}
+                    >
+                      {monthOptions.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={2.4}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ color: textPrimaryColor }}>
+                      Year
+                    </InputLabel>
+                    <Select
+                      value={selectedYear}
+                      onChange={handleYearChange}
+                      label="Year"
+                      sx={{
+                        color: textPrimaryColor,
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: alpha(accentColor, 0.3),
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                          borderColor: alpha(accentColor, 0.5),
+                        },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                          borderColor: accentColor,
+                        },
+                      }}
+                    >
+                      {yearOptions.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={2.4}>
+                  <ModernTextField
+                    fullWidth
+                    size="small"
+                    placeholder="Search employee..."
+                    value={searchTerm}
+                    onChange={handleSearchChange}
+                    disabled={isSearching}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon
+                            sx={{ color: textPrimaryColor }}
+                            fontSize="small"
+                          />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        color: textPrimaryColor,
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: alpha(accentColor, 0.3),
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                          borderColor: alpha(accentColor, 0.5),
+                        },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                          borderColor: accentColor,
+                        },
+                      },
+                    }}
+                  />
+                </Grid>
+              </Grid>
+            </CardContent>
+          </GlassCard>
+        </Fade>
+
+        {/* Alerts */}
+        {duplicateEmployeeNumbers.length > 0 && (
+          <Fade in timeout={300}>
+            <Alert
+              severity="warning"
+              sx={{
+                mb: 3,
+                borderRadius: 3,
+                '& .MuiAlert-message': { fontWeight: 500 },
+              }}
+              icon={<Warning />}
+            >
+              Duplicate employee number(s) found:{' '}
+              {duplicateEmployeeNumbers.join(', ')}
+            </Alert>
+          </Fade>
+        )}
+
+        {error && (
+          <Fade in timeout={300}>
+            <Alert
+              severity="error"
+              sx={{
+                mb: 3,
+                borderRadius: 3,
+                '& .MuiAlert-message': { fontWeight: 500 },
+              }}
+              icon={<Error />}
+            >
+              {error}
+            </Alert>
+          </Fade>
+        )}
+
+        {/* Table View Section */}
+        <Fade in timeout={900}>
+          <GlassCard
+            sx={{
+              mb: 4,
+              background: `rgba(${hexToRgb(primaryColor)}, 0.95)`,
+              boxShadow: `0 8px 40px ${alpha(accentColor, 0.08)}`,
+              border: `1px solid ${alpha(accentColor, 0.1)}`,
+              overflow: 'visible',
+              '&:hover': {
+                boxShadow: `0 12px 48px ${alpha(accentColor, 0.15)}`,
+              },
+            }}
+          >
+            {/* Table Header */}
+            <Box
+              sx={{
+                p: 4,
+                background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`,
+                color: textPrimaryColor,
+                borderBottom: `1px solid ${alpha(accentColor, 0.1)}`,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <Box>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    opacity: 0.8,
+                    mb: 1,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.1em',
+                    color: textPrimaryColor,
+                  }}
+                >
+                  Payroll Records
+                </Typography>
+                <Typography
+                  variant="h4"
+                  sx={{ fontWeight: 600, color: textPrimaryColor }}
+                >
+                  Employee Payroll Data
+                </Typography>
+              </Box>
+              <Box display="flex" gap={1} alignItems="center">
+                <Chip
+                  icon={<PeopleIcon />}
+                  label={`${selectedRows.length} Selected`}
+                  size="small"
+                  sx={{
+                    bgcolor: alpha(accentColor, 0.15),
+                    color: textPrimaryColor,
+                    fontWeight: 500,
+                  }}
+                />
+                <Badge badgeContent={selectedRows.length} color="primary">
+                  <ProfessionalButton
+                    variant="outlined"
+                    size="small"
+                    startIcon={<Refresh />}
+                    onClick={() => fetchPayrollData()}
+                    sx={{
+                      borderColor: accentColor,
+                      color: textPrimaryColor,
+                      '&:hover': {
+                        borderColor: accentDark,
+                        backgroundColor: alpha(accentColor, 0.1),
+                      },
+                    }}
+                  >
+                    Refresh
+                  </ProfessionalButton>
+                </Badge>
+              </Box>
+            </Box>
+
+            {/* Table with Fixed Actions Column */}
+            <Box sx={{ display: 'flex', width: '100%', position: 'relative' }}>
+              {/* Scrollable Table Content */}
+              <Box
+                sx={{
+                  overflowX: 'auto',
+                  overflowY: 'visible',
+                  flex: 1,
+                  minWidth: 0,
+                  '&::-webkit-scrollbar': {
+                    height: '10px',
+                  },
+                  '&::-webkit-scrollbar-track': {
+                    background: alpha(accentColor, 0.1),
+                    borderRadius: '4px',
+                  },
+                  '&::-webkit-scrollbar-thumb': {
+                    background: alpha(accentColor, 0.4),
+                    borderRadius: '4px',
+                    '&:hover': {
+                      background: alpha(accentColor, 0.6),
+                    },
+                  },
+                }}
+              >
+                <PremiumTableContainer
+                  sx={{
+                    boxShadow: `0 4px 24px ${alpha(accentColor, 0.06)}`,
+                    border: `1px solid ${alpha(accentColor, 0.08)}`,
+                    overflowX: 'auto',
+                    overflowY: 'visible',
+                    width: 'max-content',
+                    minWidth: '100%',
+                  }}
+                >
+                  <Table sx={{ minWidth: 'max-content', tableLayout: 'auto' }}>
+                    <TableHead sx={{ bgcolor: alpha(primaryColor, 0.7) }}>
+                      <TableRow>
+                        <PremiumTableCell
+                          padding="checkbox"
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          <Checkbox
+                            sx={{
+                              color: 'white',
+                              '&.Mui-checked': {
+                                color: 'white',
+                              },
+                              '&:hover': {
+                                color: '#F5F5F5',
+                              },
+                              '&.MuiCheckbox-indeterminate': {
+                                color: 'white',
+                              },
+                            }}
+                            indeterminate={
+                              selectedRows.length > 0 &&
+                              selectedRows.length <
+                                computedRows.filter(
+                                  (row) =>
+                                    !finalizedPayroll.some(
+                                      (fp) =>
+                                        fp.employeeNumber ===
+                                          row.employeeNumber &&
+                                        fp.startDate === row.startDate &&
+                                        fp.endDate === row.endDate
+                                    )
+                                ).length
+                            }
+                            checked={
+                              selectedRows.length ===
+                              computedRows.filter(
+                                (row) =>
+                                  !finalizedPayroll.some(
+                                    (fp) =>
+                                      fp.employeeNumber ===
+                                        row.employeeNumber &&
+                                      fp.startDate === row.startDate &&
+                                      fp.endDate === row.endDate
+                                  )
+                              ).length
+                            }
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedRows(
+                                  computedRows
+                                    .filter(
+                                      (row) =>
+                                        !finalizedPayroll.some(
+                                          (fp) =>
+                                            fp.employeeNumber ===
+                                              row.employeeNumber &&
+                                            fp.startDate === row.startDate &&
+                                            fp.endDate === row.endDate
+                                        )
+                                    )
+                                    .map((row) => row.employeeNumber)
+                                );
+                              } else {
+                                setSelectedRows([]);
+                              }
+                            }}
+                          />
+                        </PremiumTableCell>
+
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          No.
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          View
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Department
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Employee Number
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Start Date
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          End Date
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Name
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Position
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Rate NBC 594
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          NBC DIFF'L 597
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Increment
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Gross Salary
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          <b>ABS</b>
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          H
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          M
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Net Salary
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Withholding Tax
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          <b>Total GSIS Deductions</b>
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          <b>Total Pag-ibig Deductions</b>
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          PhilHealth
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          <b>Total Other Deductions</b>
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          <b>Total Deductions</b>
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          1st Pay
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          2nd Pay
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          No.
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          RT Ins.
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          EC
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          PhilHealth
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Pag-Ibig
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{
+                            color: textPrimaryColor,
+                            borderLeft: '2px solid black',
+                          }}
+                        >
+                          Pay1st Compute
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Pay2nd Compute
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{
+                            color: textPrimaryColor,
+                            borderLeft: '2px solid black',
+                          }}
+                        >
+                          No.
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Name
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Position
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Withholding Tax
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Personal Life Ret Ins
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          GSIS Salary Loan
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          GSIS Policy Loan
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          gsisArrears
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          CPL
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          MPL
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          EAL
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          MPL LITE
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Emergency Loan (ELA)
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Total GSIS Deductions
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Pag-ibig Fund Contribution
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Pag-ibig 2
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Multi-Purpose Loan
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Total Pag-Ibig Deduction
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          PhilHealth
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          liquidatingCash
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          LandBank Salary Loan
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Earist Credit COOP.
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          FEU
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Total Other Deductions
+                        </PremiumTableCell>
+                        <PremiumTableCell
+                          isHeader
+                          sx={{ color: textPrimaryColor }}
+                        >
+                          Total Deductions
+                        </PremiumTableCell>
+                      </TableRow>
+                    </TableHead>
+
+                    <TableBody>
+                      {filteredData.length > 0 ? (
+                        computedRows
+                          .slice(
+                            page * rowsPerPage,
+                            page * rowsPerPage + rowsPerPage
+                          )
+                          .map((row, index) => {
+                            const isFinalized = finalizedPayroll.some(
+                              (fp) =>
+                                fp.employeeNumber === row.employeeNumber &&
+                                fp.startDate === row.startDate &&
+                                fp.endDate === row.endDate
+                            );
+
+                            return (
+                              <TableRow
+                                key={`${row.employeeNumber}-${row.dateCreated}`}
+                                sx={{
+                                  '&:nth-of-type(even)': {
+                                    bgcolor: alpha(primaryColor, 0.3),
+                                  },
+                                  '&:hover': {
+                                    backgroundColor:
+                                      alpha(accentColor, 0.05) + ' !important',
+                                  },
+                                  backgroundColor:
+                                    duplicateEmployeeNumbers.includes(
+                                      row.employeeNumber
+                                    )
+                                      ? 'rgba(255, 0, 0, 0.1)'
+                                      : 'inherit',
+                                  transition: 'all 0.2s ease',
+                                }}
+                              >
+                                <PremiumTableCell padding="checkbox">
+                                  <Checkbox
+                                    checked={selectedRows.includes(
+                                      row.employeeNumber
+                                    )}
+                                    onChange={() => {
+                                      if (
+                                        selectedRows.includes(
+                                          row.employeeNumber
+                                        )
+                                      ) {
+                                        setSelectedRows((prev) =>
+                                          prev.filter(
+                                            (id) => id !== row.employeeNumber
+                                          )
+                                        );
+                                      } else {
+                                        setSelectedRows((prev) => [
+                                          ...prev,
+                                          row.employeeNumber,
+                                        ]);
+                                      }
+                                    }}
+                                    disabled={isFinalized}
+                                  />
+                                </PremiumTableCell>
+
+                                <ExcelTableCell>
+                                  {page * rowsPerPage + index + 1}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  <Button
+                                    onClick={() => handleView(row.id)}
+                                    variant="contained"
+                                    size="small"
+                                    sx={{
+                                      bgcolor: '#ffffff',
+                                      color: '#FFFFFF',
+                                      minWidth: '80px',
+                                      border: `1px solid ${accentColor}`,
+                                      width: '32px',
+                                      height: '32px',
+                                      padding: 0,
+                                      '&:hover': {
+                                        bgcolor: accentColor,
+                                        color: textSecondaryColor,
+                                      },
+                                    }}
+                                    title="View Record"
+                                  >
+                                    <Visibility fontSize="small" />
+                                    View
+                                  </Button>
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.department}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.employeeNumber}
+                                </ExcelTableCell>
+                                <ExcelTableCell>{row.startDate}</ExcelTableCell>
+                                <ExcelTableCell>{row.endDate}</ExcelTableCell>
+                                <ExcelTableCell>{row.name}</ExcelTableCell>
+                                <ExcelTableCell>{row.position}</ExcelTableCell>
+
+                                <ExcelTableCell>
+                                  {row.rateNbc594
+                                    ? Number(row.rateNbc594).toLocaleString(
+                                        'en-US',
+                                        {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        }
+                                      )
+                                    : ''}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.nbcDiffl597
+                                    ? Number(row.nbcDiffl597).toLocaleString(
+                                        'en-US',
+                                        {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        }
+                                      )
+                                    : ''}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.increment
+                                    ? Number(row.increment).toLocaleString(
+                                        'en-US',
+                                        {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        }
+                                      )
+                                    : ''}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.grossSalary}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  <b>{row.abs}</b>
+                                </ExcelTableCell>
+                                <ExcelTableCell>{row.h}</ExcelTableCell>
+                                <ExcelTableCell>{row.m}</ExcelTableCell>
+                                <ExcelTableCell>{row.netSalary}</ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.withholdingTax}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.totalGsisDeds}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.totalPagibigDeds}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.PhilHealthContribution}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.totalOtherDeds}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.totalDeductions}
+                                </ExcelTableCell>
+                                <ExcelTableCell
+                                  sx={{ color: 'red', fontWeight: 'bold' }}
+                                >
+                                  {row.pay1st}
+                                </ExcelTableCell>
+                                <ExcelTableCell
+                                  sx={{ color: 'red', fontWeight: 'bold' }}
+                                >
+                                  {row.pay2nd}
+                                </ExcelTableCell>
+                                <ExcelTableCell>{index + 1}</ExcelTableCell>
+                                <ExcelTableCell>{row.rtIns}</ExcelTableCell>
+                                <ExcelTableCell>{row.ec}</ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.PhilHealthContribution}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.pagibigFundCont}
+                                </ExcelTableCell>
+                                <ExcelTableCell
+                                  sx={{
+                                    borderLeft: '2px solid black',
+                                    color: 'red',
+                                    fontWeight: 'bold',
+                                  }}
+                                >
+                                  {row.pay1stCompute}
+                                </ExcelTableCell>
+                                <ExcelTableCell
+                                  sx={{ color: 'red', fontWeight: 'bold' }}
+                                >
+                                  {row.pay2ndCompute}
+                                </ExcelTableCell>
+                                <ExcelTableCell
+                                  sx={{ borderLeft: '2px solid black' }}
+                                >
+                                  {index + 1}
+                                </ExcelTableCell>
+                                <ExcelTableCell>{row.name}</ExcelTableCell>
+                                <ExcelTableCell>{row.position}</ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.withholdingTax
+                                    ? Number(row.withholdingTax).toLocaleString(
+                                        'en-US',
+                                        {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        }
+                                      )
+                                    : ''}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.personalLifeRetIns}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.gsisSalaryLoan
+                                    ? Number(row.gsisSalaryLoan).toLocaleString(
+                                        'en-US',
+                                        {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        }
+                                      )
+                                    : ''}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.gsisPolicyLoan
+                                    ? Number(row.gsisPolicyLoan).toLocaleString(
+                                        'en-US',
+                                        {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        }
+                                      )
+                                    : ''}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.gsisArrears
+                                    ? Number(row.gsisArrears).toLocaleString(
+                                        'en-US',
+                                        {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        }
+                                      )
+                                    : ''}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.cpl
+                                    ? Number(row.cpl).toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })
+                                    : ''}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.mpl
+                                    ? Number(row.mpl).toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })
+                                    : ''}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.eal
+                                    ? Number(row.eal).toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })
+                                    : ''}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.mplLite
+                                    ? Number(row.mplLite).toLocaleString(
+                                        'en-US',
+                                        {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        }
+                                      )
+                                    : ''}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.emergencyLoan
+                                    ? Number(row.emergencyLoan).toLocaleString(
+                                        'en-US',
+                                        {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        }
+                                      )
+                                    : ''}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.totalGsisDeds}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.pagibigFundCont
+                                    ? Number(
+                                        row.pagibigFundCont
+                                      ).toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })
+                                    : ''}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.pagibig2
+                                    ? Number(row.pagibig2).toLocaleString(
+                                        'en-US',
+                                        {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        }
+                                      )
+                                    : ''}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.multiPurpLoan
+                                    ? Number(row.multiPurpLoan).toLocaleString(
+                                        'en-US',
+                                        {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        }
+                                      )
+                                    : ''}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.totalPagibigDeds}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.PhilHealthContribution}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.liquidatingCash
+                                    ? Number(
+                                        row.liquidatingCash
+                                      ).toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })
+                                    : ''}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.landbankSalaryLoan
+                                    ? Number(
+                                        row.landbankSalaryLoan
+                                      ).toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })
+                                    : ''}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.earistCreditCoop
+                                    ? Number(
+                                        row.earistCreditCoop
+                                      ).toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })
+                                    : ''}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.feu
+                                    ? Number(row.feu).toLocaleString('en-US', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })
+                                    : ''}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.totalOtherDeds}
+                                </ExcelTableCell>
+                                <ExcelTableCell>
+                                  {row.totalDeductions}
+                                </ExcelTableCell>
+                              </TableRow>
+                            );
+                          })
+                      ) : (
+                        <TableRow>
+                          <PremiumTableCell
+                            colSpan={50}
+                            align="center"
+                            sx={{ py: 8 }}
+                          >
+                            <Box sx={{ textAlign: 'center' }}>
+                              <Info
+                                sx={{
+                                  fontSize: 80,
+                                  color: alpha(accentColor, 0.3),
+                                  mb: 3,
+                                }}
+                              />
+                              <Typography
+                                variant="h5"
+                                sx={{
+                                  color: alpha(accentColor, 0.6),
+                                  fontWeight: 600,
+                                }}
+                                gutterBottom
+                              >
+                                No Records Found
+                              </Typography>
+                              <Typography
+                                variant="body1"
+                                sx={{ color: alpha(accentColor, 0.4) }}
+                              >
+                                No payroll records available. Try adjusting your
+                                filters.
+                              </Typography>
+                            </Box>
+                          </PremiumTableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </PremiumTableContainer>
+              </Box>
+
+              {/* Fixed Status Column */}
+              <Box
+                sx={{
+                  width: '130px',
+                  minWidth: '130px',
+                  borderLeft: `2px solid ${alpha(accentColor, 0.2)}`,
+                  backgroundColor: alpha(primaryColor, 0.3),
+                  position: 'sticky',
+                  right: '120px',
+                  zIndex: 1,
+                  boxShadow: `-2px 0 5px ${alpha(accentColor, 0.1)}`,
+                }}
+              >
+                <Table
+                  size="small"
+                  sx={{ tableLayout: 'fixed', width: '100%' }}
+                >
+                  <TableHead>
+                    <TableRow>
+                      <TableCell
+                        sx={{
+                          backgroundColor: alpha(primaryColor, 0.7),
+                          fontWeight: 'bold',
+                          textAlign: 'center',
+                          borderBottom: `1px solid ${alpha(accentColor, 0.1)}`,
+                          padding: '8px',
+                          position: 'sticky',
+                          paddingTop: 3.5,
+                          paddingBottom: 3.5,
+                          zIndex: 2,
+                          color: textPrimaryColor,
+                        }}
+                      >
+                        Status
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {filteredData.length > 0 ? (
+                      computedRows
+                        .slice(
+                          page * rowsPerPage,
+                          page * rowsPerPage + rowsPerPage
+                        )
+                        .map((row, index) => {
+                          const isFinalized = finalizedPayroll.some(
+                            (fp) =>
+                              fp.employeeNumber === row.employeeNumber &&
+                              fp.startDate === row.startDate &&
+                              fp.endDate === row.endDate
+                          );
+
+                          return (
+                            <TableRow
+                              key={`status-${row.employeeNumber}-${row.dateCreated}`}
+                              sx={{
+                                '&:nth-of-type(even)': {
+                                  bgcolor: alpha(primaryColor, 0.3),
+                                },
+                                '&:hover': {
+                                  backgroundColor:
+                                    alpha(accentColor, 0.05) + ' !important',
+                                },
+                                backgroundColor:
+                                  duplicateEmployeeNumbers.includes(
+                                    row.employeeNumber
+                                  )
+                                    ? 'rgba(255, 0, 0, 0.1)'
+                                    : 'inherit',
+                                transition: 'all 0.2s ease',
+                              }}
+                            >
+                              <TableCell
+                                sx={{
+                                  padding: '8px',
+                                  textAlign: 'center',
+                                  borderBottom: `1px solid ${alpha(
+                                    accentColor,
+                                    0.06
+                                  )}`,
+                                  pt: 3.4,
+                                  pb: 3.4,
+                                }}
+                              >
+                                <Chip
+                                  label={row.status}
+                                  size="small"
+                                  sx={{
+                                    fontWeight: 'bold',
+                                    backgroundColor:
+                                      row.status === 'Processed'
+                                        ? '#4caf50'
+                                        : '#ff9800',
+                                    color: 'white',
+                                    '&:hover': {
+                                      backgroundColor:
+                                        row.status === 'Processed'
+                                          ? '#45a049'
+                                          : '#fb8c00',
+                                    },
+                                  }}
+                                />
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                    ) : (
+                      <TableRow>
+                        <TableCell
+                          sx={{
+                            textAlign: 'center',
+                            borderBottom: `1px solid ${alpha(
+                              accentColor,
+                              0.06
+                            )}`,
+                            padding: '8px',
+                          }}
+                        >
+                          -
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </Box>
+
+              {/* Fixed Actions Column */}
+              <Box
+                sx={{
+                  width: '120px',
+                  minWidth: '120px',
+                  borderLeft: `2px solid ${alpha(accentColor, 0.2)}`,
+                  backgroundColor: alpha(primaryColor, 0.3),
+                  position: 'sticky',
+                  right: 0,
+                  zIndex: 1,
+                  boxShadow: `-2px 0 5px ${alpha(accentColor, 0.1)}`,
+                }}
+              >
+                <Table
+                  size="small"
+                  sx={{ tableLayout: 'fixed', width: '100%' }}
+                >
+                  <TableHead>
+                    <TableRow>
+                      <TableCell
+                        sx={{
+                          backgroundColor: alpha(primaryColor, 0.7),
+                          fontWeight: 'bold',
+                          textAlign: 'center',
+                          borderBottom: `1px solid ${alpha(accentColor, 0.1)}`,
+                          padding: '8px',
+                          position: 'sticky',
+                          paddingTop: 3.5,
+                          paddingBottom: 3.5,
+                          zIndex: 2,
+                          color: textPrimaryColor,
+                        }}
+                      >
+                        Actions
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {filteredData.length > 0 ? (
+                      computedRows
+                        .slice(
+                          page * rowsPerPage,
+                          page * rowsPerPage + rowsPerPage
+                        )
+                        .map((row, index) => {
+                          const isFinalized = finalizedPayroll.some(
+                            (fp) =>
+                              fp.employeeNumber === row.employeeNumber &&
+                              fp.startDate === row.startDate &&
+                              fp.endDate === row.endDate
+                          );
+
+                          return (
+                            <TableRow
+                              key={`actions-${row.employeeNumber}-${row.dateCreated}`}
+                              sx={{
+                                '&:nth-of-type(even)': {
+                                  bgcolor: alpha(primaryColor, 0.3),
+                                },
+                                '&:hover': {
+                                  backgroundColor:
+                                    alpha(accentColor, 0.05) + ' !important',
+                                },
+                                backgroundColor:
+                                  duplicateEmployeeNumbers.includes(
+                                    row.employeeNumber
+                                  )
+                                    ? 'rgba(255, 0, 0, 0.1)'
+                                    : 'inherit',
+                                transition: 'all 0.2s ease',
+                              }}
+                            >
+                              <TableCell
+                                sx={{
+                                  padding: '8px',
+                                  textAlign: 'center',
+                                  borderBottom: `1px solid ${alpha(
+                                    accentColor,
+                                    0.06
+                                  )}`,
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    gap: 0.5,
+                                    paddingTop: 2,
+                                    paddingBottom: 2,
+                                  }}
+                                >
+                                  <Tooltip title="Edit Record">
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => handleEdit(row.id)}
+                                      disabled={isFinalized}
+                                      sx={{
+                                        color: isFinalized
+                                          ? '#ccc'
+                                          : accentColor,
+                                        backgroundColor: isFinalized
+                                          ? '#f5f5f5'
+                                          : 'white',
+                                        border: `1px solid ${accentColor}`,
+                                        '&:hover': {
+                                          backgroundColor: isFinalized
+                                            ? '#f5f5f5'
+                                            : alpha(accentColor, 0.1),
+                                        },
+                                        padding: '4px',
+                                      }}
+                                    >
+                                      <EditIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="Delete Record">
+                                    <IconButton
+                                      size="small"
+                                      onClick={() =>
+                                        handleDelete(row.id, row.employeeNumber)
+                                      }
+                                      disabled={isFinalized}
+                                      sx={{
+                                        color: isFinalized ? '#ccc' : '#d32f2f',
+                                        backgroundColor: isFinalized
+                                          ? '#f5f5f5'
+                                          : 'white',
+                                        border: '1px solid #d32f2f',
+                                        '&:hover': {
+                                          backgroundColor: isFinalized
+                                            ? '#f5f5f5'
+                                            : 'rgba(211, 47, 47, 0.1)',
+                                        },
+                                        padding: '4px',
+                                      }}
+                                    >
+                                      <DeleteIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                </Box>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                    ) : (
+                      <TableRow>
+                        <TableCell
+                          sx={{
+                            textAlign: 'center',
+                            borderBottom: `1px solid ${alpha(
+                              accentColor,
+                              0.06
+                            )}`,
+                            padding: '8px',
+                          }}
+                        >
+                          No actions
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </Box>
+            </Box>
+
+            {/* Table Footer */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                borderTop: `1px solid ${alpha(accentColor, 0.1)}`,
+                px: 4,
+                py: 2,
+                bgcolor: alpha(primaryColor, 0.5),
+              }}
+            >
+              <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+                <Typography
+                  variant="body2"
+                  sx={{ fontWeight: 'bold', color: textPrimaryColor }}
+                >
+                  Total Records: {filteredData.length}
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{ fontWeight: 'bold', color: textPrimaryColor }}
+                >
+                  Selected: {selectedRows.length}
+                </Typography>
+              </Box>
+              <TablePagination
+                component="div"
+                count={filteredData.length}
+                page={page}
+                onPageChange={handleChangePage}
+                rowsPerPage={rowsPerPage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+                rowsPerPageOptions={[10, 25, 50, 100]}
+                sx={{
+                  '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows':
+                    {
+                      color: textPrimaryColor,
+                    },
+                  '& .MuiIconButton-root': {
+                    color: textPrimaryColor,
+                  },
+                }}
+              />
+            </Box>
+          </GlassCard>
+        </Fade>
+
+        {/* Action Buttons */}
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 3 }}>
+          <ProfessionalButton
+            variant="contained"
+            onClick={() => setShowConfirmation(true)}
+            disabled={!canSubmit}
+            size="large"
+            sx={{
+              backgroundColor: accentColor,
+              color: textSecondaryColor,
+              '&:hover': { backgroundColor: accentDark },
+              '&:disabled': {
+                backgroundColor: alpha(accentColor, 0.3),
+                color: alpha(textSecondaryColor, 0.5),
+              },
+            }}
+            startIcon={<ExitToApp />}
+          >
+            Export Payroll Records ({selectedRows.length})
+          </ProfessionalButton>
+
+          <ProfessionalButton
+            variant="outlined"
+            onClick={() => (window.location.href = '/payroll-processed')}
+            size="large"
+            sx={{
+              borderColor: accentColor,
+              color: textPrimaryColor,
+              '&:hover': {
+                borderColor: accentDark,
+                backgroundColor: alpha(accentColor, 0.1),
+              },
+            }}
+            startIcon={<CreditCard />}
+          >
+            View Processed Payroll
+          </ProfessionalButton>
+        </Box>
+
+        {/* [All existing modals remain the same - Edit Modal, View Modal, Confirmation Modal] */}
+        <Modal open={openModal} onClose={handleCancel}>
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '95vw',
+              maxWidth: 1600,
+              height: '90vh',
+              bgcolor: 'background.paper',
+              borderRadius: 2,
+              boxShadow: 24,
+              display: 'flex',
+              flexDirection: 'column',
+              border: `3px solid ${accentColor}`,
+            }}
+          >
+            {editRow && (
+              <>
+                {/* Header */}
+                <Box
+                  sx={{
+                    p: 3,
+                    bgcolor: accentColor,
+                    color: 'white',
+                    borderRadius: '2px 2px 0 0',
+                  }}
+                >
+                  <Typography variant="h5" fontWeight="bold">
+                    Edit Payroll Record - {editRow.name}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{ opacity: 0.9, mt: 0.5, fontWeight: 'bold' }}
+                  >
+                    Employee Number: {editRow.employeeNumber}
+                  </Typography>
+                </Box>
+
+                {/* Main Content - Split View */}
+                <Box
+                  sx={{
+                    flex: 1,
+                    display: 'flex',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {/* LEFT SIDE - Original Values (Read-only) */}
+                  <Box
+                    sx={{
+                      width: '50%',
+                      p: 3,
+                      overflowY: 'auto',
+                      bgcolor: '#f8f8f8',
+                      borderRight: `2px solid ${accentColor}`,
+                      '&::-webkit-scrollbar': { width: '8px' },
+                      '&::-webkit-scrollbar-track': { background: '#f1f1f1' },
+                      '&::-webkit-scrollbar-thumb': {
+                        background: '#888',
+                        borderRadius: '4px',
+                      },
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        mb: 3,
+                      }}
+                    >
+                      <Compare sx={{ color: accentColor }} />
+                      <Typography
+                        variant="h6"
+                        fontWeight="bold"
+                        sx={{ color: accentColor }}
+                      >
+                        Original Values
+                      </Typography>
+                    </Box>
+
+                    {/* Employee Information */}
+                    <Paper sx={{ p: 2, mb: 2, bgcolor: 'white' }}>
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight="bold"
+                        gutterBottom
+                        sx={{ color: accentColor }}
+                      >
+                        Employee Information
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Employee Number
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.employeeNumber}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Name
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.name}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Position
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.position}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Department
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.department}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Start Date
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.startDate}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            End Date
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.endDate}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </Paper>
+
+                    {/* Salary Rate and Adjustments */}
+                    <Paper sx={{ p: 2, mb: 2, bgcolor: 'white' }}>
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight="bold"
+                        gutterBottom
+                        sx={{ color: accentColor }}
+                      >
+                        Salary Rate and Adjustments
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Rate NBC 584
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.rateNbc584 || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            NBC 594
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.nbc594 || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Rate NBC 594
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            fontWeight="500"
+                            sx={{ color: accentColor }}
+                          >
+                            {editRow.rateNbc594 || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            NBC DIFF'L 597
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.nbcDiffl597 || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Increment
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.increment || '0.00'}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </Paper>
+
+                    {/* Absent Deductions */}
+                    <Paper sx={{ p: 2, mb: 2, bgcolor: 'white' }}>
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight="bold"
+                        gutterBottom
+                        sx={{ color: accentColor }}
+                      >
+                        Absent Deductions
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={4}>
+                          <Typography variant="caption" color="text.secondary">
+                            ABS
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.abs || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={4}>
+                          <Typography variant="caption" color="text.secondary">
+                            Hours (H)
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.h || '0'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={4}>
+                          <Typography variant="caption" color="text.secondary">
+                            Minutes (M)
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.m || '0'}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </Paper>
+
+                    {/* Payroll Disbursement */}
+                    <Paper sx={{ p: 2, mb: 2, bgcolor: 'white' }}>
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight="bold"
+                        gutterBottom
+                        sx={{ color: accentColor }}
+                      >
+                        Payroll Disbursement
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={4}>
+                          <Typography variant="caption" color="text.secondary">
+                            1st Pay
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.pay1st || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={4}>
+                          <Typography variant="caption" color="text.secondary">
+                            2nd Pay
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.pay2nd || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={4}>
+                          <Typography variant="caption" color="text.secondary">
+                            EC
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.ec || '0.00'}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </Paper>
+
+                    {/* GSIS Deductions */}
+                    <Paper sx={{ p: 2, mb: 2, bgcolor: 'white' }}>
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight="bold"
+                        gutterBottom
+                        sx={{ color: accentColor }}
+                      >
+                        GSIS Deductions
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Personal Life Ret Ins
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.personalLifeRetIns || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            GSIS Salary Loan
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.gsisSalaryLoan || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            GSIS Policy Loan
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.gsisPolicyLoan || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            GSIS Arrears
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.gsisArrears || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            MPL
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.mpl || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            EAL
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.eal || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            CPL
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.cpl || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            MPL Lite
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.mplLite || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Emergency Loan
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.emergencyLoan || '0.00'}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </Paper>
+
+                    {/* Pag-IBIG Deductions */}
+                    <Paper sx={{ p: 2, mb: 2, bgcolor: 'white' }}>
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight="bold"
+                        gutterBottom
+                        sx={{ color: accentColor }}
+                      >
+                        Pag-IBIG Deductions
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Pag-ibig Fund Cont
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.pagibigFundCont || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Multi-Purpose Loan
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.multiPurpLoan || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Pag-ibig 2
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.pagibig2 || '0.00'}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </Paper>
+
+                    {/* Other Deductions */}
+                    <Paper sx={{ p: 2, mb: 2, bgcolor: 'white' }}>
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight="bold"
+                        gutterBottom
+                        sx={{ color: accentColor }}
+                      >
+                        Other Deductions
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Liquidating Cash
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.liquidatingCash || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Earist Credit Coop
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.earistCreditCoop || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            FEU
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.feu || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            LandBank Salary Loan
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.landbankSalaryLoan || '0.00'}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </Paper>
+
+                    {/* Total Deductions */}
+                    <Paper sx={{ p: 2, mb: 2, bgcolor: 'white' }}>
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight="bold"
+                        gutterBottom
+                        sx={{ color: accentColor }}
+                      >
+                        Total Contributions & Deductions
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Withholding Tax
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.withholdingTax || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Total GSIS Deds
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.totalGsisDeds || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Total Pag-ibig Deds
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.totalPagibigDeds || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            PhilHealth
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.PhilHealthContribution || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Total Other Deds
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {editRow.totalOtherDeds || '0.00'}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="caption" color="text.secondary">
+                            Total Deductions
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            fontWeight="bold"
+                            sx={{ color: '#d32f2f' }}
+                          >
+                            {editRow.totalDeductions || '0.00'}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </Paper>
+                  </Box>
+
+                  {/* RIGHT SIDE - Editable Fields */}
+                  <Box
+                    sx={{
+                      width: '50%',
+                      p: 3,
+                      overflowY: 'auto',
+                      bgcolor: 'white',
+                      '&::-webkit-scrollbar': { width: '8px' },
+                      '&::-webkit-scrollbar-track': { background: '#f1f1f1' },
+                      '&::-webkit-scrollbar-thumb': {
+                        background: '#888',
+                        borderRadius: '4px',
+                      },
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        mb: 3,
+                      }}
+                    >
+                      <EditIcon sx={{ color: accentColor }} />
+                      <Typography
+                        variant="h6"
+                        fontWeight="bold"
+                        sx={{ color: accentColor }}
+                      >
+                        Edit Values
+                      </Typography>
+                    </Box>
+
+                    {/* Employee Information - Editable */}
+                    <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0' }}>
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight="bold"
+                        gutterBottom
+                        sx={{ color: accentColor }}
+                      >
+                        Employee Information
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="Employee Number"
+                            name="employeeNumber"
+                            value={editRow.employeeNumber || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="Name"
+                            name="name"
+                            value={editRow.name || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="Position"
+                            name="position"
+                            value={editRow.position || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>Department</InputLabel>
+                            <Select
+                              name="department"
+                              value={editRow.department || ''}
+                              onChange={handleModalChange}
+                              label="Department"
+                            >
+                              <MenuItem value="">
+                                <em>All Departments</em>
+                              </MenuItem>
+                              {departments.map((dept) => (
+                                <MenuItem key={dept.id} value={dept.code}>
+                                  {dept.description}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="Start Date"
+                            name="startDate"
+                            value={editRow.startDate || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="End Date"
+                            name="endDate"
+                            value={editRow.endDate || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                      </Grid>
+                    </Paper>
+
+                    {/* Salary Rate and Adjustments - Editable */}
+                    <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0' }}>
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight="bold"
+                        gutterBottom
+                        sx={{ color: accentColor }}
+                      >
+                        Salary Rate and Adjustments
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="Rate NBC 584"
+                            name="rateNbc584"
+                            value={editRow.rateNbc584 || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="NBC 594"
+                            name="nbc594"
+                            value={editRow.nbc594 || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="Rate NBC 594"
+                            name="rateNbc594"
+                            value={editRow.rateNbc594 || ''}
+                            onChange={handleModalChange}
+                            disabled
+                            size="small"
+                            sx={{
+                              '& .MuiInputBase-input.Mui-disabled': {
+                                WebkitTextFillColor: accentColor,
+                                fontWeight: 'bold',
+                              },
+                            }}
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="NBC DIFF'L 597"
+                            name="nbcDiffl597"
+                            value={editRow.nbcDiffl597 || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="Increment"
+                            name="increment"
+                            value={editRow.increment || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                      </Grid>
+                    </Paper>
+
+                    {/* Absent Deductions - Editable */}
+                    <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0' }}>
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight="bold"
+                        gutterBottom
+                        sx={{ color: accentColor }}
+                      >
+                        Absent Deductions
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={4}>
+                          <TextField
+                            fullWidth
+                            label="ABS"
+                            name="abs"
+                            value={editRow.abs || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={4}>
+                          <TextField
+                            fullWidth
+                            label="Hours (H)"
+                            name="h"
+                            value={editRow.h || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={4}>
+                          <TextField
+                            fullWidth
+                            label="Minutes (M)"
+                            name="m"
+                            value={editRow.m || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                      </Grid>
+                    </Paper>
+
+                    {/* Payroll Disbursement - Editable */}
+                    <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0' }}>
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight="bold"
+                        gutterBottom
+                        sx={{ color: accentColor }}
+                      >
+                        Payroll Disbursement
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={4}>
+                          <TextField
+                            fullWidth
+                            label="1st Pay"
+                            name="pay1st"
+                            value={editRow.pay1st || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={4}>
+                          <TextField
+                            fullWidth
+                            label="2nd Pay"
+                            name="pay2nd"
+                            value={editRow.pay2nd || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={4}>
+                          <TextField
+                            fullWidth
+                            label="EC"
+                            name="ec"
+                            value={editRow.ec || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                      </Grid>
+                    </Paper>
+
+                    {/* GSIS Deductions - Editable */}
+                    <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0' }}>
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight="bold"
+                        gutterBottom
+                        sx={{ color: accentColor }}
+                      >
+                        GSIS Deductions
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="Personal Life Ret Ins"
+                            name="personalLifeRetIns"
+                            value={editRow.personalLifeRetIns || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="GSIS Salary Loan"
+                            name="gsisSalaryLoan"
+                            value={editRow.gsisSalaryLoan || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="GSIS Policy Loan"
+                            name="gsisPolicyLoan"
+                            value={editRow.gsisPolicyLoan || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="GSIS Arrears"
+                            name="gsisArrears"
+                            value={editRow.gsisArrears || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="MPL"
+                            name="mpl"
+                            value={editRow.mpl || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="EAL"
+                            name="eal"
+                            value={editRow.eal || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="CPL"
+                            name="cpl"
+                            value={editRow.cpl || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="MPL Lite"
+                            name="mplLite"
+                            value={editRow.mplLite || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="Emergency Loan"
+                            name="emergencyLoan"
+                            value={editRow.emergencyLoan || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                      </Grid>
+                    </Paper>
+
+                    {/* Pag-IBIG Deductions - Editable */}
+                    <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0' }}>
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight="bold"
+                        gutterBottom
+                        sx={{ color: accentColor }}
+                      >
+                        Pag-IBIG Deductions
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="Pag-ibig Fund Cont"
+                            name="pagibigFundCont"
+                            value={editRow.pagibigFundCont || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="Multi-Purpose Loan"
+                            name="multiPurpLoan"
+                            value={editRow.multiPurpLoan || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="Pag-ibig 2"
+                            name="pagibig2"
+                            value={editRow.pagibig2 || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                      </Grid>
+                    </Paper>
+
+                    {/* Other Deductions - Editable */}
+                    <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0' }}>
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight="bold"
+                        gutterBottom
+                        sx={{ color: accentColor }}
+                      >
+                        Other Deductions
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="Liquidating Cash"
+                            name="liquidatingCash"
+                            value={editRow.liquidatingCash || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="Earist Credit Coop"
+                            name="earistCreditCoop"
+                            value={editRow.earistCreditCoop || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="FEU"
+                            name="feu"
+                            value={editRow.feu || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="LandBank Salary Loan"
+                            name="landbankSalaryLoan"
+                            value={editRow.landbankSalaryLoan || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                      </Grid>
+                    </Paper>
+
+                    {/* Total Deductions - Editable */}
+                    <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0' }}>
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight="bold"
+                        gutterBottom
+                        sx={{ color: accentColor }}
+                      >
+                        Total Contributions & Deductions
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="Withholding Tax"
+                            name="withholdingTax"
+                            value={editRow.withholdingTax || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="Total GSIS Deds"
+                            name="totalGsisDeds"
+                            value={editRow.totalGsisDeds || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="Total Pag-ibig Deds"
+                            name="totalPagibigDeds"
+                            value={editRow.totalPagibigDeds || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="PhilHealth"
+                            name="PhilHealthContribution"
+                            value={editRow.PhilHealthContribution || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="Total Other Deds"
+                            name="totalOtherDeds"
+                            value={editRow.totalOtherDeds || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            label="Total Deductions"
+                            name="totalDeductions"
+                            value={editRow.totalDeductions || ''}
+                            onChange={handleModalChange}
+                            size="small"
+                            sx={{
+                              '& .MuiInputBase-input': {
+                                fontWeight: 'bold',
+                                color: '#d32f2f',
+                              },
+                            }}
+                          />
+                        </Grid>
+                      </Grid>
+                    </Paper>
+                  </Box>
+                </Box>
+
+                {/* Footer with Action Buttons */}
+                <Box
+                  sx={{
+                    p: 2.5,
+                    borderTop: '2px solid #e0e0e0',
+                    bgcolor: '#f8f8f8',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Typography variant="body2" color="text.secondary">
+                    💡 Tip: Compare original values on the left with your edits
+                    on the right
+                  </Typography>
+                  <Box display="flex" gap={2}>
+                    <Button
+                      variant="outlined"
+                      onClick={handleCancel}
+                      startIcon={<CancelIcon />}
+                      sx={{
+                        textTransform: 'none',
+                        width: '120px',
+                        borderColor: accentColor,
+                        color: accentColor,
+                        '&:hover': {
+                          borderColor: accentColor,
+                          bgcolor: alpha(accentColor, 0.04),
+                        },
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="contained"
+                      onClick={handleSave}
+                      startIcon={<SaveIcon />}
+                      sx={{
+                        textTransform: 'none',
+                        width: '120px',
+                        backgroundColor: accentColor,
+                        color: textSecondaryColor,
+                        '&:hover': {
+                          backgroundColor: accentDark,
+                        },
+                      }}
+                    >
+                      Save
+                    </Button>
+                  </Box>
+                </Box>
+              </>
+            )}
+          </Box>
+        </Modal>
+
+        {/*MODAL FOR THE VIEW*/}
+        <Modal open={openViewModal} onClose={handleCloseView}>
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '50vw',
+              maxWidth: 1600,
+              height: '90vh',
+              bgcolor: 'background.paper',
+              borderRadius: 2,
+              boxShadow: 24,
+              display: 'flex',
+              flexDirection: 'column',
+              border: `3px solid ${accentColor}`,
+            }}
+          >
+            {viewRow && (
+              <>
+                {/* Header */}
+                <Box
+                  sx={{
+                    p: 3,
+                    bgcolor: accentColor,
+                    color: 'white',
+                    borderRadius: '2px 2px 0 0',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Box>
+                    <Typography variant="h5" fontWeight="bold">
+                      View Payroll Record - {viewRow.name}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ opacity: 0.9, mt: 0.5, fontWeight: 'bold' }}
+                    >
+                      Employee Number: {viewRow.employeeNumber}
+                    </Typography>
+                  </Box>
+                  <Button
+                    onClick={handleCloseView}
+                    sx={{
+                      color: 'white',
+                      minWidth: 'auto',
+                      '&:hover': {
+                        bgcolor: 'rgba(255,255,255,0.1)',
+                      },
+                    }}
+                  >
+                    <Close />
+                  </Button>
+                </Box>
+
+                {/* Main Content - Single Column View (Read-only) */}
+                <Box
+                  sx={{
+                    flex: 1,
                     p: 3,
                     overflowY: 'auto',
                     bgcolor: '#f8f8f8',
-                    borderRight: '2px solid #6d2323',
                     '&::-webkit-scrollbar': { width: '8px' },
                     '&::-webkit-scrollbar-track': { background: '#f1f1f1' },
                     '&::-webkit-scrollbar-thumb': {
@@ -2049,9 +4756,13 @@ const PayrollProcess = () => {
                       mb: 3,
                     }}
                   >
-                    <Compare sx={{ color: '#6d2323' }} />
-                    <Typography variant="h6" fontWeight="bold" color="#6d2323">
-                      Original Values
+                    <PeopleIcon sx={{ color: accentColor }} />
+                    <Typography
+                      variant="h6"
+                      fontWeight="bold"
+                      sx={{ color: accentColor }}
+                    >
+                      Employee Payroll Details
                     </Typography>
                   </Box>
 
@@ -2061,57 +4772,57 @@ const PayrollProcess = () => {
                       variant="subtitle1"
                       fontWeight="bold"
                       gutterBottom
-                      sx={{ color: '#6d2323' }}
+                      sx={{ color: accentColor }}
                     >
                       Employee Information
                     </Typography>
                     <Grid container spacing={2}>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           Employee Number
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.employeeNumber}
+                          {viewRow.employeeNumber}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           Name
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.name}
+                          {viewRow.name}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           Position
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.position}
+                          {viewRow.position}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           Department
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.department}
+                          {viewRow.department}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           Start Date
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.startDate}
+                          {viewRow.startDate}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           End Date
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.endDate}
+                          {viewRow.endDate}
                         </Typography>
                       </Grid>
                     </Grid>
@@ -2123,53 +4834,102 @@ const PayrollProcess = () => {
                       variant="subtitle1"
                       fontWeight="bold"
                       gutterBottom
-                      sx={{ color: '#6d2323' }}
+                      sx={{ color: accentColor }}
                     >
                       Salary Rate and Adjustments
                     </Typography>
                     <Grid container spacing={2}>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           Rate NBC 584
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.rateNbc584 || '0.00'}
+                          {viewRow.rateNbc584
+                            ? Number(viewRow.rateNbc584).toLocaleString(
+                                'en-US',
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                }
+                              )
+                            : '0.00'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           NBC 594
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.nbc594 || '0.00'}
+                          {viewRow.nbc594
+                            ? Number(viewRow.nbc594).toLocaleString('en-US', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })
+                            : '0.00'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           Rate NBC 594
                         </Typography>
                         <Typography
                           variant="body2"
-                          fontWeight="500"
-                          sx={{ color: '#6d2323' }}
+                          fontWeight="bold"
+                          sx={{ color: '#2E7D32' }}
                         >
-                          {editRow.rateNbc594 || '0.00'}
+                          {viewRow.rateNbc594
+                            ? Number(viewRow.rateNbc594).toLocaleString(
+                                'en-US',
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                }
+                              )
+                            : '0.00'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           NBC DIFF'L 597
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.nbcDiffl597 || '0.00'}
+                          {viewRow.nbcDiffl597
+                            ? Number(viewRow.nbcDiffl597).toLocaleString(
+                                'en-US',
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                }
+                              )
+                            : '0.00'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           Increment
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.increment || '0.00'}
+                          {viewRow.increment
+                            ? Number(viewRow.increment).toLocaleString(
+                                'en-US',
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                }
+                              )
+                            : '0.00'}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Typography variant="caption" color="text.secondary">
+                          Gross Salary
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          fontWeight="bold"
+                          sx={{ color: '#2E7D32' }}
+                        >
+                          {viewRow.grossSalary}
                         </Typography>
                       </Grid>
                     </Grid>
@@ -2181,7 +4941,7 @@ const PayrollProcess = () => {
                       variant="subtitle1"
                       fontWeight="bold"
                       gutterBottom
-                      sx={{ color: '#6d2323' }}
+                      sx={{ color: accentColor }}
                     >
                       Absent Deductions
                     </Typography>
@@ -2191,7 +4951,7 @@ const PayrollProcess = () => {
                           ABS
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.abs || '0.00'}
+                          {viewRow.abs || '0.00'}
                         </Typography>
                       </Grid>
                       <Grid item xs={4}>
@@ -2199,7 +4959,7 @@ const PayrollProcess = () => {
                           Hours (H)
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.h || '0'}
+                          {viewRow.h || '0'}
                         </Typography>
                       </Grid>
                       <Grid item xs={4}>
@@ -2207,7 +4967,19 @@ const PayrollProcess = () => {
                           Minutes (M)
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.m || '0'}
+                          {viewRow.m || '0'}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Typography variant="caption" color="text.secondary">
+                          Net Salary
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          fontWeight="bold"
+                          sx={{ color: '#2E7D32' }}
+                        >
+                          {viewRow.netSalary}
                         </Typography>
                       </Grid>
                     </Grid>
@@ -2219,33 +4991,49 @@ const PayrollProcess = () => {
                       variant="subtitle1"
                       fontWeight="bold"
                       gutterBottom
-                      sx={{ color: '#6d2323' }}
+                      sx={{ color: accentColor }}
                     >
                       Payroll Disbursement
                     </Typography>
                     <Grid container spacing={2}>
-                      <Grid item xs={4}>
+                      <Grid item xs={3}>
                         <Typography variant="caption" color="text.secondary">
                           1st Pay
                         </Typography>
-                        <Typography variant="body2" fontWeight="500">
-                          {editRow.pay1st || '0.00'}
+                        <Typography
+                          variant="body2"
+                          fontWeight="bold"
+                          sx={{ color: 'red' }}
+                        >
+                          {viewRow.pay1st || '0.00'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={4}>
+                      <Grid item xs={3}>
                         <Typography variant="caption" color="text.secondary">
                           2nd Pay
                         </Typography>
-                        <Typography variant="body2" fontWeight="500">
-                          {editRow.pay2nd || '0.00'}
+                        <Typography
+                          variant="body2"
+                          fontWeight="bold"
+                          sx={{ color: 'red' }}
+                        >
+                          {viewRow.pay2nd || '0.00'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={4}>
+                      <Grid item xs={3}>
                         <Typography variant="caption" color="text.secondary">
                           EC
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.ec || '0.00'}
+                          {viewRow.ec || '0.00'}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={3}>
+                        <Typography variant="caption" color="text.secondary">
+                          RT Ins.
+                        </Typography>
+                        <Typography variant="body2" fontWeight="500">
+                          {viewRow.rtIns || '0.00'}
                         </Typography>
                       </Grid>
                     </Grid>
@@ -2257,81 +5045,145 @@ const PayrollProcess = () => {
                       variant="subtitle1"
                       fontWeight="bold"
                       gutterBottom
-                      sx={{ color: '#6d2323' }}
+                      sx={{ color: accentColor }}
                     >
                       GSIS Deductions
                     </Typography>
                     <Grid container spacing={2}>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           Personal Life Ret Ins
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.personalLifeRetIns || '0.00'}
+                          {viewRow.personalLifeRetIns || '0.00'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           GSIS Salary Loan
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.gsisSalaryLoan || '0.00'}
+                          {viewRow.gsisSalaryLoan
+                            ? Number(viewRow.gsisSalaryLoan).toLocaleString(
+                                'en-US',
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                }
+                              )
+                            : '0.00'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           GSIS Policy Loan
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.gsisPolicyLoan || '0.00'}
+                          {viewRow.gsisPolicyLoan
+                            ? Number(viewRow.gsisPolicyLoan).toLocaleString(
+                                'en-US',
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                }
+                              )
+                            : '0.00'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           GSIS Arrears
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.gsisArrears || '0.00'}
+                          {viewRow.gsisArrears
+                            ? Number(viewRow.gsisArrears).toLocaleString(
+                                'en-US',
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                }
+                              )
+                            : '0.00'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           MPL
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.mpl || '0.00'}
+                          {viewRow.mpl
+                            ? Number(viewRow.mpl).toLocaleString('en-US', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })
+                            : '0.00'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           EAL
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.eal || '0.00'}
+                          {viewRow.eal
+                            ? Number(viewRow.eal).toLocaleString('en-US', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })
+                            : '0.00'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           CPL
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.cpl || '0.00'}
+                          {viewRow.cpl
+                            ? Number(viewRow.cpl).toLocaleString('en-US', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })
+                            : '0.00'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           MPL Lite
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.mplLite || '0.00'}
+                          {viewRow.mplLite
+                            ? Number(viewRow.mplLite).toLocaleString('en-US', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })
+                            : '0.00'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           Emergency Loan
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.emergencyLoan || '0.00'}
+                          {viewRow.emergencyLoan
+                            ? Number(viewRow.emergencyLoan).toLocaleString(
+                                'en-US',
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                }
+                              )
+                            : '0.00'}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Typography variant="caption" color="text.secondary">
+                          Total GSIS Deductions
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          fontWeight="bold"
+                          sx={{ color: '#d32f2f' }}
+                        >
+                          {viewRow.totalGsisDeds || '0.00'}
                         </Typography>
                       </Grid>
                     </Grid>
@@ -2343,33 +5195,66 @@ const PayrollProcess = () => {
                       variant="subtitle1"
                       fontWeight="bold"
                       gutterBottom
-                      sx={{ color: '#6d2323' }}
+                      sx={{ color: accentColor }}
                     >
                       Pag-IBIG Deductions
                     </Typography>
                     <Grid container spacing={2}>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           Pag-ibig Fund Cont
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.pagibigFundCont || '0.00'}
+                          {viewRow.pagibigFundCont
+                            ? Number(viewRow.pagibigFundCont).toLocaleString(
+                                'en-US',
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                }
+                              )
+                            : '0.00'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           Multi-Purpose Loan
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.multiPurpLoan || '0.00'}
+                          {viewRow.multiPurpLoan
+                            ? Number(viewRow.multiPurpLoan).toLocaleString(
+                                'en-US',
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                }
+                              )
+                            : '0.00'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           Pag-ibig 2
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.pagibig2 || '0.00'}
+                          {viewRow.pagibig2
+                            ? Number(viewRow.pagibig2).toLocaleString('en-US', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })
+                            : '0.00'}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Typography variant="caption" color="text.secondary">
+                          Total Pag-ibig Deductions
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          fontWeight="bold"
+                          sx={{ color: '#d32f2f' }}
+                        >
+                          {viewRow.totalPagibigDeds || '0.00'}
                         </Typography>
                       </Grid>
                     </Grid>
@@ -2381,1681 +5266,1024 @@ const PayrollProcess = () => {
                       variant="subtitle1"
                       fontWeight="bold"
                       gutterBottom
-                      sx={{ color: '#6d2323' }}
+                      sx={{ color: accentColor }}
                     >
                       Other Deductions
                     </Typography>
                     <Grid container spacing={2}>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           Liquidating Cash
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.liquidatingCash || '0.00'}
+                          {viewRow.liquidatingCash
+                            ? Number(viewRow.liquidatingCash).toLocaleString(
+                                'en-US',
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                }
+                              )
+                            : '0.00'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           Earist Credit Coop
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.earistCreditCoop || '0.00'}
+                          {viewRow.earistCreditCoop
+                            ? Number(viewRow.earistCreditCoop).toLocaleString(
+                                'en-US',
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                }
+                              )
+                            : '0.00'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           FEU
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.feu || '0.00'}
+                          {viewRow.feu
+                            ? Number(viewRow.feu).toLocaleString('en-US', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })
+                            : '0.00'}
                         </Typography>
                       </Grid>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
                           LandBank Salary Loan
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {editRow.landbankSalaryLoan || '0.00'}
+                          {viewRow.landbankSalaryLoan
+                            ? Number(viewRow.landbankSalaryLoan).toLocaleString(
+                                'en-US',
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                }
+                              )
+                            : '0.00'}
                         </Typography>
                       </Grid>
-                    </Grid>
-                  </Paper>
-
-                  {/* Total Deductions */}
-                  <Paper sx={{ p: 2, mb: 2, bgcolor: 'white' }}>
-                    <Typography
-                      variant="subtitle1"
-                      fontWeight="bold"
-                      gutterBottom
-                      sx={{ color: '#6d2323' }}
-                    >
-                      Total Contributions & Deductions
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={6}>
+                      <Grid item xs={4}>
                         <Typography variant="caption" color="text.secondary">
-                          Withholding Tax
-                        </Typography>
-                        <Typography variant="body2" fontWeight="500">
-                          {editRow.withholdingTax || '0.00'}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <Typography variant="caption" color="text.secondary">
-                          Total GSIS Deds
-                        </Typography>
-                        <Typography variant="body2" fontWeight="500">
-                          {editRow.totalGsisDeds || '0.00'}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <Typography variant="caption" color="text.secondary">
-                          Total Pag-ibig Deds
-                        </Typography>
-                        <Typography variant="body2" fontWeight="500">
-                          {editRow.totalPagibigDeds || '0.00'}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <Typography variant="caption" color="text.secondary">
-                          PhilHealth
-                        </Typography>
-                        <Typography variant="body2" fontWeight="500">
-                          {editRow.PhilHealthContribution || '0.00'}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <Typography variant="caption" color="text.secondary">
-                          Total Other Deds
-                        </Typography>
-                        <Typography variant="body2" fontWeight="500">
-                          {editRow.totalOtherDeds || '0.00'}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <Typography variant="caption" color="text.secondary">
-                          Total Deductions
+                          Total Other Deductions
                         </Typography>
                         <Typography
                           variant="body2"
                           fontWeight="bold"
                           sx={{ color: '#d32f2f' }}
                         >
-                          {editRow.totalDeductions || '0.00'}
+                          {viewRow.totalOtherDeds || '0.00'}
+                        </Typography>
+                      </Grid>
+                    </Grid>
+                  </Paper>
+
+                  {/* Total Deductions Summary */}
+                  <Paper
+                    sx={{
+                      p: 2,
+                      mb: 2,
+                      bgcolor: 'white',
+                      border: '2px solid #2E7D32',
+                    }}
+                  >
+                    <Typography
+                      variant="subtitle1"
+                      fontWeight="bold"
+                      gutterBottom
+                      sx={{ color: accentColor }}
+                    >
+                      Total Contributions & Deductions Summary
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid item xs={4}>
+                        <Typography variant="caption" color="text.secondary">
+                          Withholding Tax
+                        </Typography>
+                        <Typography variant="body2" fontWeight="500">
+                          {viewRow.withholdingTax
+                            ? Number(viewRow.withholdingTax).toLocaleString(
+                                'en-US',
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                }
+                              )
+                            : '0.00'}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Typography variant="caption" color="text.secondary">
+                          PhilHealth
+                        </Typography>
+                        <Typography variant="body2" fontWeight="500">
+                          {viewRow.PhilHealthContribution || '0.00'}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Typography variant="caption" color="text.secondary">
+                          Total Deductions
+                        </Typography>
+                        <Typography
+                          variant="body1"
+                          fontWeight="bold"
+                          sx={{ color: '#d32f2f', fontSize: '1.1rem' }}
+                        >
+                          {viewRow.totalDeductions || '0.00'}
+                        </Typography>
+                      </Grid>
+                    </Grid>
+                  </Paper>
+
+                  {/* Status */}
+                  <Paper sx={{ p: 2, mb: 2, bgcolor: 'white' }}>
+                    <Typography
+                      variant="subtitle1"
+                      fontWeight="bold"
+                      gutterBottom
+                      sx={{ color: accentColor }}
+                    >
+                      Processing Status
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12}>
+                        <Typography variant="caption" color="text.secondary">
+                          Status
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          fontWeight="bold"
+                          sx={{
+                            color:
+                              viewRow.status === 'Processed'
+                                ? 'green'
+                                : 'orange',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1,
+                          }}
+                        >
+                          {viewRow.status === 'Processed' ? (
+                            <CheckCircleIcon sx={{ fontSize: 20 }} />
+                          ) : (
+                            <PendingIcon sx={{ fontSize: 20 }} />
+                          )}
+                          {viewRow.status}
                         </Typography>
                       </Grid>
                     </Grid>
                   </Paper>
                 </Box>
 
-                {/* RIGHT SIDE - Editable Fields */}
+                {/* Footer with Close Button */}
                 <Box
                   sx={{
-                    width: '50%',
-                    p: 3,
-                    overflowY: 'auto',
-                    bgcolor: 'white',
-                    '&::-webkit-scrollbar': { width: '8px' },
-                    '&::-webkit-scrollbar-track': { background: '#f1f1f1' },
-                    '&::-webkit-scrollbar-thumb': {
-                      background: '#888',
-                      borderRadius: '4px',
-                    },
+                    p: 2.5,
+                    borderTop: '2px solid #e0e0e0',
+                    bgcolor: '#f8f8f8',
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    alignItems: 'center',
                   }}
                 >
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 1,
-                      mb: 3,
-                    }}
-                  >
-                    <EditIcon sx={{ color: '#6d2323' }} />
-                    <Typography variant="h6" fontWeight="bold" color="#6d2323">
-                      Edit Values
-                    </Typography>
-                  </Box>
-
-                  {/* Employee Information - Editable */}
-                  <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0' }}>
-                    <Typography
-                      variant="subtitle1"
-                      fontWeight="bold"
-                      gutterBottom
-                      sx={{ color: '#6d2323' }}
-                    >
-                      Employee Information
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="Employee Number"
-                          name="employeeNumber"
-                          value={editRow.employeeNumber || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="Name"
-                          name="name"
-                          value={editRow.name || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="Position"
-                          name="position"
-                          value={editRow.position || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <FormControl fullWidth size="small">
-                          <InputLabel>Department</InputLabel>
-                          <Select
-                            name="department"
-                            value={editRow.department || ''}
-                            onChange={handleModalChange}
-                            label="Department"
-                          >
-                            <MenuItem value="">
-                              <em>All Departments</em>
-                            </MenuItem>
-                            {departments.map((dept) => (
-                              <MenuItem key={dept.id} value={dept.code}>
-                                {dept.description}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="Start Date"
-                          name="startDate"
-                          value={editRow.startDate || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="End Date"
-                          name="endDate"
-                          value={editRow.endDate || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                    </Grid>
-                  </Paper>
-
-                  {/* Salary Rate and Adjustments - Editable */}
-                  <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0' }}>
-                    <Typography
-                      variant="subtitle1"
-                      fontWeight="bold"
-                      gutterBottom
-                      sx={{ color: '#6d2323' }}
-                    >
-                      Salary Rate and Adjustments
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="Rate NBC 584"
-                          name="rateNbc584"
-                          value={editRow.rateNbc584 || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="NBC 594"
-                          name="nbc594"
-                          value={editRow.nbc594 || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="Rate NBC 594"
-                          name="rateNbc594"
-                          value={editRow.rateNbc594 || ''}
-                          onChange={handleModalChange}
-                          disabled
-                          size="small"
-                          sx={{
-                            '& .MuiInputBase-input.Mui-disabled': {
-                              WebkitTextFillColor: '#6d2323',
-                              fontWeight: 'bold',
-                            },
-                          }}
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="NBC DIFF'L 597"
-                          name="nbcDiffl597"
-                          value={editRow.nbcDiffl597 || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="Increment"
-                          name="increment"
-                          value={editRow.increment || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                    </Grid>
-                  </Paper>
-
-                  {/* Absent Deductions - Editable */}
-                  <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0' }}>
-                    <Typography
-                      variant="subtitle1"
-                      fontWeight="bold"
-                      gutterBottom
-                      sx={{ color: '#6d2323' }}
-                    >
-                      Absent Deductions
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={4}>
-                        <TextField
-                          fullWidth
-                          label="ABS"
-                          name="abs"
-                          value={editRow.abs || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={4}>
-                        <TextField
-                          fullWidth
-                          label="Hours (H)"
-                          name="h"
-                          value={editRow.h || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={4}>
-                        <TextField
-                          fullWidth
-                          label="Minutes (M)"
-                          name="m"
-                          value={editRow.m || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                    </Grid>
-                  </Paper>
-
-                  {/* Payroll Disbursement - Editable */}
-                  <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0' }}>
-                    <Typography
-                      variant="subtitle1"
-                      fontWeight="bold"
-                      gutterBottom
-                      sx={{ color: '#6d2323' }}
-                    >
-                      Payroll Disbursement
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={4}>
-                        <TextField
-                          fullWidth
-                          label="1st Pay"
-                          name="pay1st"
-                          value={editRow.pay1st || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={4}>
-                        <TextField
-                          fullWidth
-                          label="2nd Pay"
-                          name="pay2nd"
-                          value={editRow.pay2nd || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={4}>
-                        <TextField
-                          fullWidth
-                          label="EC"
-                          name="ec"
-                          value={editRow.ec || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                    </Grid>
-                  </Paper>
-
-                  {/* GSIS Deductions - Editable */}
-                  <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0' }}>
-                    <Typography
-                      variant="subtitle1"
-                      fontWeight="bold"
-                      gutterBottom
-                      sx={{ color: '#6d2323' }}
-                    >
-                      GSIS Deductions
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="Personal Life Ret Ins"
-                          name="personalLifeRetIns"
-                          value={editRow.personalLifeRetIns || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="GSIS Salary Loan"
-                          name="gsisSalaryLoan"
-                          value={editRow.gsisSalaryLoan || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="GSIS Policy Loan"
-                          name="gsisPolicyLoan"
-                          value={editRow.gsisPolicyLoan || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="GSIS Arrears"
-                          name="gsisArrears"
-                          value={editRow.gsisArrears || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="MPL"
-                          name="mpl"
-                          value={editRow.mpl || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="EAL"
-                          name="eal"
-                          value={editRow.eal || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="CPL"
-                          name="cpl"
-                          value={editRow.cpl || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="MPL Lite"
-                          name="mplLite"
-                          value={editRow.mplLite || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="Emergency Loan"
-                          name="emergencyLoan"
-                          value={editRow.emergencyLoan || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                    </Grid>
-                  </Paper>
-
-                  {/* Pag-IBIG Deductions - Editable */}
-                  <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0' }}>
-                    <Typography
-                      variant="subtitle1"
-                      fontWeight="bold"
-                      gutterBottom
-                      sx={{ color: '#6d2323' }}
-                    >
-                      Pag-IBIG Deductions
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="Pag-ibig Fund Cont"
-                          name="pagibigFundCont"
-                          value={editRow.pagibigFundCont || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="Multi-Purpose Loan"
-                          name="multiPurpLoan"
-                          value={editRow.multiPurpLoan || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="Pag-ibig 2"
-                          name="pagibig2"
-                          value={editRow.pagibig2 || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                    </Grid>
-                  </Paper>
-
-                  {/* Other Deductions - Editable */}
-                  <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0' }}>
-                    <Typography
-                      variant="subtitle1"
-                      fontWeight="bold"
-                      gutterBottom
-                      sx={{ color: '#6d2323' }}
-                    >
-                      Other Deductions
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="Liquidating Cash"
-                          name="liquidatingCash"
-                          value={editRow.liquidatingCash || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="Earist Credit Coop"
-                          name="earistCreditCoop"
-                          value={editRow.earistCreditCoop || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="FEU"
-                          name="feu"
-                          value={editRow.feu || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="LandBank Salary Loan"
-                          name="landbankSalaryLoan"
-                          value={editRow.landbankSalaryLoan || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                    </Grid>
-                  </Paper>
-
-                  {/* Total Deductions - Editable */}
-                  <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0' }}>
-                    <Typography
-                      variant="subtitle1"
-                      fontWeight="bold"
-                      gutterBottom
-                      sx={{ color: '#6d2323' }}
-                    >
-                      Total Contributions & Deductions
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="Withholding Tax"
-                          name="withholdingTax"
-                          value={editRow.withholdingTax || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="Total GSIS Deds"
-                          name="totalGsisDeds"
-                          value={editRow.totalGsisDeds || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="Total Pag-ibig Deds"
-                          name="totalPagibigDeds"
-                          value={editRow.totalPagibigDeds || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="PhilHealth"
-                          name="PhilHealthContribution"
-                          value={editRow.PhilHealthContribution || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="Total Other Deds"
-                          name="totalOtherDeds"
-                          value={editRow.totalOtherDeds || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          label="Total Deductions"
-                          name="totalDeductions"
-                          value={editRow.totalDeductions || ''}
-                          onChange={handleModalChange}
-                          size="small"
-                          sx={{
-                            '& .MuiInputBase-input': {
-                              fontWeight: 'bold',
-                              color: '#d32f2f',
-                            },
-                          }}
-                        />
-                      </Grid>
-                    </Grid>
-                  </Paper>
-                </Box>
-              </Box>
-
-              {/* Footer with Action Buttons */}
-              <Box
-                sx={{
-                  p: 2.5,
-                  borderTop: '2px solid #e0e0e0',
-                  bgcolor: '#f8f8f8',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <Typography variant="body2" color="text.secondary">
-                  💡 Tip: Compare original values on the left with your edits on the right
-                </Typography>
-                <Box display="flex" gap={2}>
-                  <Button
-                    variant="outlined"
-                    onClick={handleCancel}
-                    startIcon={<CancelIcon />}
-                    sx={{
-                      textTransform: 'none',
-                      width: '120px',
-                      borderColor: '#6d2323',
-                      color: '#6d2323',
-                      '&:hover': {
-                        borderColor: '#6d2323',
-                        bgcolor: 'rgba(109, 35, 35, 0.04)',
-                      },
-                    }}
-                  >
-                    Cancel
-                  </Button>
                   <Button
                     variant="contained"
-                    onClick={handleSave}
-                    startIcon={<SaveIcon />}
+                    onClick={handleCloseView}
+                    startIcon={<Close />}
                     sx={{
                       textTransform: 'none',
                       width: '120px',
                       backgroundColor: '#6d2323',
-                      color: '#fff',
+                      color: textSecondaryColor,
                       '&:hover': {
-                        backgroundColor: '#5b1d1d',
+                        backgroundColor: '#ffffff',
+                        border: `1px solid ${accentColor}`,
+                        color: accentColor,
                       },
                     }}
                   >
-                    Save
+                    Close
                   </Button>
                 </Box>
-              </Box>
-            </>
-          )}
-        </Box>
-      </Modal>
+              </>
+            )}
+          </Box>
+        </Modal>
 
-      {/*MODAL FOR THE VIEW*/}
-      <Modal open={openViewModal} onClose={handleCloseView}>
-        <Box
-          sx={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: '50vw',
-            maxWidth: 1600,
-            height: '90vh',
-            bgcolor: 'background.paper',
-            borderRadius: 2,
-            boxShadow: 24,
-            display: 'flex',
-            flexDirection: 'column',
-            border: '3px solid #6d2323',
+        <Modal
+          open={showConfirmation}
+          onClose={() => {
+            setShowConfirmation(false);
+            setConfirmChecked(false);
           }}
         >
-          {viewRow && (
-            <>
-              {/* Header */}
-              <Box
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: { xs: '90%', sm: 500 },
+              maxWidth: 600,
+              bgcolor: 'white',
+              borderRadius: 3,
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+              overflow: 'hidden',
+              border: `2px solid ${accentColor}`,
+            }}
+          >
+            {/* Clean White Header with Accent */}
+            <Box
+              sx={{
+                p: 3,
+                bgcolor: 'white',
+                borderBottom: `3px solid ${accentColor}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+              }}
+            >
+              <Avatar
                 sx={{
-                  p: 3,
-                  bgcolor: '#6d2323',
-                  color: 'white',
-                  borderRadius: '2px 2px 0 0',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
+                  bgcolor: alpha(accentColor, 0.1),
+                  color: accentColor,
+                  width: 56,
+                  height: 56,
                 }}
               >
-                <Box>
-                  <Typography variant="h5" fontWeight="bold">
-                    View Payroll Record - {viewRow.name}
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{ opacity: 0.9, mt: 0.5, fontWeight: 'bold' }}
-                  >
-                    Employee Number: {viewRow.employeeNumber}
-                  </Typography>
-                </Box>
-                <Button
-                  onClick={handleCloseView}
-                  sx={{
-                    color: 'white',
-                    minWidth: 'auto',
-                    '&:hover': {
-                      bgcolor: 'rgba(255,255,255,0.1)',
-                    },
-                  }}
+                <Payment sx={{ fontSize: 28 }} />
+              </Avatar>
+              <Box>
+                <Typography
+                  variant="h5"
+                  sx={{ fontWeight: 'bold', color: '#333' }}
                 >
-                  <Close />
-                </Button>
+                  Confirm Payroll Export
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#666' }}>
+                  Final confirmation required
+                </Typography>
               </Box>
+            </Box>
 
-              {/* Main Content - Single Column View (Read-only) */}
-              <Box
+            {/* Content */}
+            <Box sx={{ p: 4, bgcolor: 'white' }}>
+              <Alert
+                severity="info"
+                icon={<Info />}
                 sx={{
-                  flex: 1,
-                  p: 3,
-                  overflowY: 'auto',
-                  bgcolor: '#f8f8f8',
-                  '&::-webkit-scrollbar': { width: '8px' },
-                  '&::-webkit-scrollbar-track': { background: '#f1f1f1' },
-                  '&::-webkit-scrollbar-thumb': {
-                    background: '#888',
-                    borderRadius: '4px',
+                  mb: 3,
+                  borderRadius: 2,
+                  bgcolor: alpha(accentColor, 0.05),
+                  border: `1px solid ${alpha(accentColor, 0.2)}`,
+                  '& .MuiAlert-icon': {
+                    color: accentColor,
+                    fontSize: 28,
                   },
                 }}
               >
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                    mb: 3,
-                  }}
+                <Typography
+                  variant="body1"
+                  sx={{ fontWeight: 600, mb: 1, color: '#333' }}
                 >
-                  <PeopleIcon sx={{ color: '#6d2323' }} />
-                  <Typography variant="h6" fontWeight="bold" color="#6d2323">
-                    Employee Payroll Details
-                  </Typography>
-                </Box>
+                  Export {selectedRows.length} Payroll Record(s)
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#666' }}>
+                  Please review all selected payroll records before proceeding.
+                  This action will finalize and export the payroll data.
+                </Typography>
+              </Alert>
 
-                {/* Employee Information */}
-                <Paper sx={{ p: 2, mb: 2, bgcolor: 'white' }}>
-                  <Typography
-                    variant="subtitle1"
-                    fontWeight="bold"
-                    gutterBottom
-                    sx={{ color: '#6d2323' }}
-                  >
-                    Employee Information
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Employee Number
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.employeeNumber}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Name
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.name}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Position
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.position}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Department
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.department}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Start Date
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.startDate}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        End Date
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.endDate}
-                      </Typography>
-                    </Grid>
-                  </Grid>
-                </Paper>
-
-                {/* Salary Rate and Adjustments */}
-                <Paper sx={{ p: 2, mb: 2, bgcolor: 'white' }}>
-                  <Typography
-                    variant="subtitle1"
-                    fontWeight="bold"
-                    gutterBottom
-                    sx={{ color: '#6d2323' }}
-                  >
-                    Salary Rate and Adjustments
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Rate NBC 584
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.rateNbc584
-                          ? Number(viewRow.rateNbc584).toLocaleString('en-US', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })
-                          : '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        NBC 594
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.nbc594
-                          ? Number(viewRow.nbc594).toLocaleString('en-US', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })
-                          : '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Rate NBC 594
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        fontWeight="bold"
-                        sx={{ color: '#2E7D32' }}
-                      >
-                        {viewRow.rateNbc594
-                          ? Number(viewRow.rateNbc594).toLocaleString('en-US', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })
-                          : '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        NBC DIFF'L 597
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.nbcDiffl597
-                          ? Number(viewRow.nbcDiffl597).toLocaleString(
-                              'en-US',
-                              {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              }
-                            )
-                          : '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Increment
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.increment
-                          ? Number(viewRow.increment).toLocaleString('en-US', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })
-                          : '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Gross Salary
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        fontWeight="bold"
-                        sx={{ color: '#2E7D32' }}
-                      >
-                        {viewRow.grossSalary}
-                      </Typography>
-                    </Grid>
-                  </Grid>
-                </Paper>
-
-                {/* Absent Deductions */}
-                <Paper sx={{ p: 2, mb: 2, bgcolor: 'white' }}>
-                  <Typography
-                    variant="subtitle1"
-                    fontWeight="bold"
-                    gutterBottom
-                    sx={{ color: '#6d2323' }}
-                  >
-                    Absent Deductions
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        ABS
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.abs || '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Hours (H)
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.h || '0'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Minutes (M)
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.m || '0'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Net Salary
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        fontWeight="bold"
-                        sx={{ color: '#2E7D32' }}
-                      >
-                        {viewRow.netSalary}
-                      </Typography>
-                    </Grid>
-                  </Grid>
-                </Paper>
-
-                {/* Payroll Disbursement */}
-                <Paper sx={{ p: 2, mb: 2, bgcolor: 'white' }}>
-                  <Typography
-                    variant="subtitle1"
-                    fontWeight="bold"
-                    gutterBottom
-                    sx={{ color: '#6d2323' }}
-                  >
-                    Payroll Disbursement
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={3}>
-                      <Typography variant="caption" color="text.secondary">
-                        1st Pay
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        fontWeight="bold"
-                        sx={{ color: 'red' }}
-                      >
-                        {viewRow.pay1st || '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={3}>
-                      <Typography variant="caption" color="text.secondary">
-                        2nd Pay
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        fontWeight="bold"
-                        sx={{ color: 'red' }}
-                      >
-                        {viewRow.pay2nd || '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={3}>
-                      <Typography variant="caption" color="text.secondary">
-                        EC
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.ec || '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={3}>
-                      <Typography variant="caption" color="text.secondary">
-                        RT Ins.
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.rtIns || '0.00'}
-                      </Typography>
-                    </Grid>
-                  </Grid>
-                </Paper>
-
-                {/* GSIS Deductions */}
-                <Paper sx={{ p: 2, mb: 2, bgcolor: 'white' }}>
-                  <Typography
-                    variant="subtitle1"
-                    fontWeight="bold"
-                    gutterBottom
-                    sx={{ color: '#6d2323' }}
-                  >
-                    GSIS Deductions
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Personal Life Ret Ins
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.personalLifeRetIns || '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        GSIS Salary Loan
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.gsisSalaryLoan
-                          ? Number(viewRow.gsisSalaryLoan).toLocaleString(
-                              'en-US',
-                              {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              }
-                            )
-                          : '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        GSIS Policy Loan
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.gsisPolicyLoan
-                          ? Number(viewRow.gsisPolicyLoan).toLocaleString(
-                              'en-US',
-                              {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              }
-                            )
-                          : '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        GSIS Arrears
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.gsisArrears
-                          ? Number(viewRow.gsisArrears).toLocaleString(
-                              'en-US',
-                              {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              }
-                            )
-                          : '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        MPL
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.mpl
-                          ? Number(viewRow.mpl).toLocaleString('en-US', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })
-                          : '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        EAL
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.eal
-                          ? Number(viewRow.eal).toLocaleString('en-US', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })
-                          : '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        CPL
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.cpl
-                          ? Number(viewRow.cpl).toLocaleString('en-US', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })
-                          : '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        MPL Lite
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.mplLite
-                          ? Number(viewRow.mplLite).toLocaleString(
-                              'en-US',
-                              {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              }
-                            )
-                          : '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Emergency Loan
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.emergencyLoan
-                          ? Number(viewRow.emergencyLoan).toLocaleString(
-                              'en-US',
-                              {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              }
-                            )
-                          : '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Total GSIS Deductions
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        fontWeight="bold"
-                        sx={{ color: '#d32f2f' }}
-                      >
-                        {viewRow.totalGsisDeds || '0.00'}
-                      </Typography>
-                    </Grid>
-                  </Grid>
-                </Paper>
-
-                {/* Pag-IBIG Deductions */}
-                <Paper sx={{ p: 2, mb: 2, bgcolor: 'white' }}>
-                  <Typography
-                    variant="subtitle1"
-                    fontWeight="bold"
-                    gutterBottom
-                    sx={{ color: '#6d2323' }}
-                  >
-                    Pag-IBIG Deductions
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Pag-ibig Fund Cont
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.pagibigFundCont
-                          ? Number(viewRow.pagibigFundCont).toLocaleString(
-                              'en-US',
-                              {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              }
-                            )
-                          : '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Multi-Purpose Loan
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.multiPurpLoan
-                          ? Number(viewRow.multiPurpLoan).toLocaleString(
-                              'en-US',
-                              {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              }
-                            )
-                          : '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Pag-ibig 2
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.pagibig2
-                          ? Number(viewRow.pagibig2).toLocaleString('en-US', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })
-                          : '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Total Pag-ibig Deductions
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        fontWeight="bold"
-                        sx={{ color: '#d32f2f' }}
-                      >
-                        {viewRow.totalPagibigDeds || '0.00'}
-                      </Typography>
-                    </Grid>
-                  </Grid>
-                </Paper>
-
-                {/* Other Deductions */}
-                <Paper sx={{ p: 2, mb: 2, bgcolor: 'white' }}>
-                  <Typography
-                    variant="subtitle1"
-                    fontWeight="bold"
-                    gutterBottom
-                    sx={{ color: '#6d2323' }}
-                  >
-                    Other Deductions
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Liquidating Cash
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.liquidatingCash
-                          ? Number(viewRow.liquidatingCash).toLocaleString(
-                              'en-US',
-                              {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              }
-                            )
-                          : '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Earist Credit Coop
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.earistCreditCoop
-                          ? Number(viewRow.earistCreditCoop).toLocaleString(
-                              'en-US',
-                              {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              }
-                            )
-                          : '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        FEU
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.feu
-                          ? Number(viewRow.feu).toLocaleString('en-US', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })
-                          : '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        LandBank Salary Loan
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.landbankSalaryLoan
-                          ? Number(viewRow.landbankSalaryLoan).toLocaleString(
-                              'en-US',
-                              {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              }
-                            )
-                          : '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Total Other Deductions
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        fontWeight="bold"
-                        sx={{ color: '#d32f2f' }}
-                      >
-                        {viewRow.totalOtherDeds || '0.00'}
-                      </Typography>
-                    </Grid>
-                  </Grid>
-                </Paper>
-
-                {/* Total Deductions Summary */}
-                <Paper
-                  sx={{
-                    p: 2,
-                    mb: 2,
-                    bgcolor: 'white',
-                    border: '2px solid #2E7D32',
-                  }}
-                >
-                  <Typography
-                    variant="subtitle1"
-                    fontWeight="bold"
-                    gutterBottom
-                    sx={{ color: '#6d2323' }}
-                  >
-                    Total Contributions & Deductions Summary
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Withholding Tax
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.withholdingTax
-                          ? Number(viewRow.withholdingTax).toLocaleString(
-                              'en-US',
-                              {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              }
-                            )
-                          : '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        PhilHealth
-                      </Typography>
-                      <Typography variant="body2" fontWeight="500">
-                        {viewRow.PhilHealthContribution || '0.00'}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Typography variant="caption" color="text.secondary">
-                        Total Deductions
-                      </Typography>
-                      <Typography
-                        variant="body1"
-                        fontWeight="bold"
-                        sx={{ color: '#d32f2f', fontSize: '1.1rem' }}
-                      >
-                        {viewRow.totalDeductions || '0.00'}
-                      </Typography>
-                    </Grid>
-                  </Grid>
-                </Paper>
-
-                {/* Status */}
-                <Paper sx={{ p: 2, mb: 2, bgcolor: 'white' }}>
-                  <Typography
-                    variant="subtitle1"
-                    fontWeight="bold"
-                    gutterBottom
-                    sx={{ color: '#6d2323' }}
-                  >
-                    Processing Status
-                  </Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12}>
-                      <Typography variant="caption" color="text.secondary">
-                        Status
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        fontWeight="bold"
-                        sx={{
-                          color:
-                            viewRow.status === 'Processed' ? 'green' : 'orange',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 1,
-                        }}
-                      >
-                        {viewRow.status === 'Processed' ? (
-                          <CheckCircleIcon sx={{ fontSize: 20 }} />
-                        ) : (
-                          <PendingIcon sx={{ fontSize: 20 }} />
-                        )}
-                        {viewRow.status}
-                      </Typography>
-                    </Grid>
-                  </Grid>
-                </Paper>
-              </Box>
-
-              {/* Footer with Close Button */}
+              {/* Confirmation Checkbox */}
               <Box
                 sx={{
                   p: 2.5,
-                  borderTop: '2px solid #e0e0e0',
-                  bgcolor: '#f8f8f8',
+                  bgcolor: '#f9f9f9',
+                  borderRadius: 2,
+                  border: `2px solid ${
+                    confirmChecked ? accentColor : '#e0e0e0'
+                  }`,
+                  mb: 3,
                   display: 'flex',
-                  justifyContent: 'flex-end',
-                  alignItems: 'center',
+                  alignItems: 'flex-start',
+                  gap: 2,
+                  transition: 'all 0.2s ease',
+                  ...(confirmChecked && {
+                    bgcolor: alpha(accentColor, 0.05),
+                  }),
                 }}
               >
-                <Button
-                  variant="contained"
-                  onClick={handleCloseView}
-                  startIcon={<Close />}
+                <Checkbox
+                  checked={confirmChecked}
+                  onChange={(e) => setConfirmChecked(e.target.checked)}
                   sx={{
+                    color: accentColor,
+                    '&.Mui-checked': {
+                      color: accentColor,
+                    },
+                    mt: -0.5,
+                  }}
+                />
+                <Box sx={{ flex: 1 }}>
+                  <Typography
+                    variant="body1"
+                    sx={{ fontWeight: 600, color: '#333', mb: 0.5 }}
+                  >
+                    I confirm that I have reviewed all payroll records
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#666' }}>
+                    All information is accurate and ready for export. I
+                    understand this action cannot be undone.
+                  </Typography>
+                </Box>
+              </Box>
+
+              {/* Action Buttons */}
+              <Box display="flex" justifyContent="flex-end" gap={2} mt={2}>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    setShowConfirmation(false);
+                    setConfirmChecked(false);
+                  }}
+                  sx={{
+                    color: accentColor,
+                    borderColor: accentColor,
+                    px: 3,
+                    py: 1.2,
+                    fontWeight: 600,
                     textTransform: 'none',
-                    width: '120px',
-                    backgroundColor: '#6d2323',
-                    color: '#fff',
+                    borderRadius: 2,
                     '&:hover': {
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #6d2323',
-                      color: '#6d2323',
+                      borderColor: accentDark,
+                      backgroundColor: alpha(accentColor, 0.08),
                     },
                   }}
                 >
-                  Close
+                  Cancel
+                </Button>
+                <Button
+                  variant="contained"
+                  disabled={!confirmChecked}
+                  onClick={async () => {
+                    setShowConfirmation(false);
+                    setConfirmChecked(false);
+                    setLoading(true);
+
+                    try {
+                      await handleSubmitPayroll();
+                      setTimeout(() => {
+                        setLoading(false);
+                        setSuccessAction('export');
+                        setSuccessOpen(true);
+                        setTimeout(() => {
+                          setSuccessOpen(false);
+                          window.location.href = '/payroll-processed';
+                        }, 2500);
+                      }, 2500);
+                    } catch (error) {
+                      console.error('Error exporting payroll:', error);
+                      setLoading(false);
+                      alert(
+                        'Failed to export payroll records. Please try again.'
+                      );
+                    }
+                  }}
+                  sx={{
+                    backgroundColor: accentColor,
+                    color: 'white',
+                    px: 4,
+                    py: 1.2,
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    borderRadius: 2,
+                    minWidth: 140,
+                    '&:hover': {
+                      backgroundColor: accentDark,
+                    },
+                    '&:disabled': {
+                      backgroundColor: '#e0e0e0',
+                      color: '#9e9e9e',
+                    },
+                  }}
+                >
+                  Confirm & Export
                 </Button>
               </Box>
-            </>
-          )}
-        </Box>
-      </Modal>
-
-      <Modal open={showConfirmation} onClose={() => setShowConfirmation(false)}>
-        <Box
-          sx={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            bgcolor: '#ffffff',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-            p: 8,
-            borderRadius: 3,
-            textAlign: 'center',
-            width: 440,
-            border: '1.5px solid #6d2323',
-          }}
-        >
-          {/* Centered Animated Icon */}
-          <Box
-            sx={{
-              position: 'relative',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              mb: 3,
-            }}
-          >
-            {/* Circular Loading Ring */}
-            <Box
-              sx={{
-                position: 'absolute',
-                width: 92,
-                height: 92,
-                borderRadius: '50%',
-                border: '3px solid transparent',
-                borderTopColor: '#6d2323',
-                borderRightColor: '#6d2323',
-                animation: 'spin 2.4s linear infinite',
-                '@keyframes spin': {
-                  '0%': { transform: 'rotate(0deg)' },
-                  '100%': { transform: 'rotate(360deg)' },
-                },
-              }}
-            />
-
-            {/* Pulsing Icon Background */}
-            <Box
-              sx={{
-                backgroundColor: '#6d232320',
-                borderRadius: '50%',
-                width: 80,
-                height: 80,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                animation: 'pulse 2s ease-in-out infinite',
-                '@keyframes pulse': {
-                  '0%': {
-                    transform: 'scale(1)',
-                    boxShadow: '0 0 0 0 rgba(109, 35, 35, 0.4)',
-                  },
-                  '50%': {
-                    transform: 'scale(1.08)',
-                    boxShadow: '0 0 0 10px rgba(109, 35, 35, 0)',
-                  },
-                  '100%': {
-                    transform: 'scale(1)',
-                    boxShadow: '0 0 0 0 rgba(109, 35, 35, 0)',
-                  },
-                },
-              }}
-            >
-              <Payment sx={{ fontSize: 44, color: '#6d2323' }} />
             </Box>
           </Box>
+        </Modal>
 
-          {/* Title and Text */}
-          <Typography
-            variant="h6"
+        {/* Loading and Success Overlays */}
+        {/* Excel-like Modal */}
+        <Modal
+          open={openExcelModal}
+          onClose={() => setOpenExcelModal(false)}
+          aria-labelledby="excel-modal-title"
+          aria-describedby="excel-modal-description"
+        >
+          <Box
             sx={{
-              color: '#6d2323',
-              mb: 1,
-              fontWeight: 'bold',
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '95vw',
+              maxWidth: '1800px',
+              height: '90vh',
+              bgcolor: 'background.paper',
+              borderRadius: 3,
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              border: `3px solid ${accentColor}`,
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '4px',
+                background: `linear-gradient(90deg, ${accentColor} 0%, ${accentDark} 100%)`,
+              },
             }}
           >
-            Confirm Submission
-          </Typography>
-
-          <Typography
-            variant="body2"
-            sx={{
-              color: 'black',
-              mb: 3,
-              px: 2,
-              pb: 1,
-            }}
-          >
-            Please ensure that all payroll information has been reviewed and
-            verified. Do you wish to proceed with the submission?
-          </Typography>
-
-          {/* Buttons */}
-          <Box display="flex" justifyContent="center" gap={2}>
-            <Button
-              variant="outlined"
-              onClick={() => setShowConfirmation(false)}
-              disabled={isSubmitting}
+            {/* Excel Modal Header */}
+            <Box
               sx={{
-                color: '#6d2323',
-                borderColor: '#6d2323',
-                '&:hover': {
-                  borderColor: '#6d2323',
-                  backgroundColor: '#6d232310',
-                },
-                px: 3,
+                p: 3,
+                bgcolor: accentColor,
+                color: textPrimaryColor,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 2,
+                borderBottom: `2px solid ${alpha(textPrimaryColor, 0.2)}`,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
               }}
             >
-              CANCEL
-            </Button>
-            <Button
-              variant="contained"
-              disabled={isSubmitting}
-              onClick={async () => {
-                setIsSubmitting(true);
-                setShowConfirmation(false);
-                setLoading(true);
+              <Box>
+                <Typography
+                  variant="h5"
+                  component="h2"
+                  sx={{ color: textPrimaryColor, fontWeight: 'bold', mb: 0.5 }}
+                >
+                  Payroll Records - Excel View
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{ color: textPrimaryColor, opacity: 0.9 }}
+                >
+                  Professional spreadsheet view for HR payroll management
+                </Typography>
+              </Box>
+              <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                <TextField
+                  size="small"
+                  placeholder="Search in table..."
+                  value={searchInExcel}
+                  onChange={(e) => {
+                    setSearchInExcel(e.target.value);
+                    // Auto-filter and highlight as user types
+                    if (e.target.value.trim()) {
+                      handleSearchInExcel();
+                    } else {
+                      setHighlightedCells([]);
+                    }
+                  }}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSearchInExcel();
+                    }
+                  }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <FindInPage sx={{ color: '#666', fontSize: '20px' }} />
+                      </InputAdornment>
+                    ),
+                    endAdornment: searchInExcel ? (
+                      <InputAdornment position="end">
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            setSearchInExcel('');
+                            setHighlightedCells([]);
+                          }}
+                          sx={{ color: '#666', '&:hover': { color: '#333' } }}
+                        >
+                          <Close />
+                        </IconButton>
+                      </InputAdornment>
+                    ) : null,
+                  }}
+                  sx={{
+                    mr: 2,
+                    width: { xs: '100%', sm: 300 },
+                    '& .MuiOutlinedInput-root': {
+                      backgroundColor: 'white',
+                      color: '#333',
+                      '&:hover': {
+                        backgroundColor: 'white',
+                      },
+                      '&.Mui-focused': {
+                        backgroundColor: 'white',
+                      },
+                    },
+                    '& .MuiInputBase-input': {
+                      color: '#333',
+                    },
+                    '& .MuiInputBase-input::placeholder': {
+                      color: '#999',
+                      opacity: 1,
+                    },
+                  }}
+                />
+                {highlightedCells.length > 0 && (
+                  <Chip
+                    label={`${highlightedCells.length} matches`}
+                    size="small"
+                    sx={{
+                      backgroundColor: textPrimaryColor,
+                      color: accentColor,
+                      fontWeight: 'bold',
+                    }}
+                  />
+                )}
+                <IconButton
+                  onClick={handleZoomOut}
+                  title="Zoom Out"
+                  sx={{
+                    color: textPrimaryColor,
+                    '&:hover': {
+                      backgroundColor: alpha(textPrimaryColor, 0.1),
+                      color: textPrimaryColor,
+                    },
+                  }}
+                >
+                  <ZoomOut fontSize="medium" />
+                </IconButton>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    mx: 1,
+                    minWidth: 40,
+                    color: textPrimaryColor,
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {Math.round(excelZoom * 100)}%
+                </Typography>
+                <IconButton
+                  onClick={handleZoomIn}
+                  title="Zoom In"
+                  sx={{
+                    color: textPrimaryColor,
+                    '&:hover': {
+                      backgroundColor: alpha(textPrimaryColor, 0.1),
+                      color: textPrimaryColor,
+                    },
+                  }}
+                >
+                  <ZoomIn fontSize="medium" />
+                </IconButton>
+                <IconButton
+                  onClick={() => setOpenExcelModal(false)}
+                  title="Close"
+                  sx={{
+                    color: textPrimaryColor,
+                    '&:hover': {
+                      backgroundColor: alpha(textPrimaryColor, 0.1),
+                      color: textPrimaryColor,
+                    },
+                  }}
+                >
+                  <Close fontSize="medium" />
+                </IconButton>
+              </Box>
+            </Box>
 
-                try {
-                  await handleSubmitPayroll();
-                  setTimeout(() => {
-                    setLoading(false);
-                    setSuccessAction('export');
-                    setSuccessOpen(true);
-                    setTimeout(() => {
-                      setSuccessOpen(false);
-                      window.location.href = '/payroll-processed';
-                    }, 2500);
-                  }, 2500);
-                } catch (error) {
-                  console.error('Error exporting payroll:', error);
-                  setLoading(false);
-                  alert('Failed to export payroll records. Please try again.');
-                } finally {
-                  setIsSubmitting(false);
-                }
-              }}
+            {/* Excel Table Container */}
+            <Box
               sx={{
-                backgroundColor: '#6d2323',
-                width: 120,
-                '&:hover': { backgroundColor: '#5b1d1d' },
+                flex: 1,
+                overflow: 'auto',
+                p: 1,
+                bgcolor: '#f5f5f5',
               }}
+              ref={excelTableRef}
             >
-              YES
-            </Button>
+              <Box
+                sx={{
+                  transform: `scale(${excelZoom})`,
+                  transformOrigin: 'top left',
+                  minWidth: '100%',
+                }}
+              >
+                <Table
+                  size="small"
+                  sx={{ borderCollapse: 'separate', borderSpacing: 0 }}
+                >
+                  {/* Column Headers */}
+                  <TableHead>
+                    <TableRow>
+                      <ExcelCell isHeader sx={{ width: 50 }}>
+                        No.
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 80 }}>
+                        View
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 120 }}>
+                        Department
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 120 }}>
+                        Employee Number
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 100 }}>
+                        Start Date
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 100 }}>
+                        End Date
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 150 }}>
+                        Name
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 150 }}>
+                        Position
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 100 }}>
+                        Rate NBC 594
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 100 }}>
+                        NBC DIFF'L 597
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 80 }}>
+                        Increment
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 100 }}>
+                        Gross Salary
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 60 }}>
+                        ABS
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 40 }}>
+                        H
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 40 }}>
+                        M
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 100 }}>
+                        Net Salary
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 100 }}>
+                        Withholding Tax
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 120 }}>
+                        Total GSIS Deductions
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 140 }}>
+                        Total Pag-ibig Deductions
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 100 }}>
+                        PhilHealth
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 120 }}>
+                        Total Other Deductions
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 100 }}>
+                        Total Deductions
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 80 }}>
+                        1st Pay
+                      </ExcelCell>
+                      <ExcelCell isHeader sx={{ width: 80 }}>
+                        2nd Pay
+                      </ExcelCell>
+                    </TableRow>
+                  </TableHead>
+
+                  {/* Table Body */}
+                  <TableBody>
+                    {getFilteredExcelRows().length === 0 ? (
+                      <TableRow>
+                        <ExcelCell
+                          colSpan={24}
+                          sx={{ textAlign: 'center', py: 8 }}
+                        >
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: 2,
+                            }}
+                          >
+                            <SearchIcon sx={{ fontSize: 64, color: '#ccc' }} />
+                            <Typography
+                              variant="h6"
+                              sx={{ color: '#666', fontWeight: 'bold' }}
+                            >
+                              No Records Found
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{ color: '#999', maxWidth: 400 }}
+                            >
+                              {searchInExcel
+                                ? `No payroll records match your search "${searchInExcel}". Try adjusting your search criteria.`
+                                : 'No payroll records available to display.'}
+                            </Typography>
+                            {searchInExcel && (
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={() => {
+                                  setSearchInExcel('');
+                                  setHighlightedCells([]);
+                                }}
+                                startIcon={<Close />}
+                                sx={{ mt: 1 }}
+                              >
+                                Clear Search
+                              </Button>
+                            )}
+                          </Box>
+                        </ExcelCell>
+                      </TableRow>
+                    ) : (
+                      getFilteredExcelRows().map((row, displayIndex) => {
+                        const isFinalized = finalizedPayroll.some(
+                          (fp) =>
+                            fp.employeeNumber === row.employeeNumber &&
+                            fp.startDate === row.startDate &&
+                            fp.endDate === row.endDate
+                        );
+
+                        return (
+                          <TableRow
+                            key={`${row.employeeNumber}-${row.dateCreated}`}
+                          >
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 0)}
+                              isHighlighted={isCellHighlighted(displayIndex, 0)}
+                              onClick={() => handleCellClick(displayIndex, 0)}
+                            >
+                              {displayIndex + 1}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 1)}
+                              isHighlighted={isCellHighlighted(displayIndex, 1)}
+                              onClick={() => handleCellClick(displayIndex, 1)}
+                            >
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleView(row.id);
+                                }}
+                                sx={{
+                                  minWidth: 'auto',
+                                  p: 0.5,
+                                  color: '#1976d2',
+                                  '&:hover': {
+                                    backgroundColor: alpha('#1976d2', 0.1),
+                                    color: '#1565c0',
+                                  },
+                                }}
+                                title="View Record"
+                              >
+                                <Visibility fontSize="small" />
+                              </IconButton>
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 2)}
+                              isHighlighted={isCellHighlighted(displayIndex, 2)}
+                              onClick={() => handleCellClick(displayIndex, 2)}
+                            >
+                              {row.department}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 3)}
+                              isHighlighted={isCellHighlighted(displayIndex, 3)}
+                              onClick={() => handleCellClick(displayIndex, 3)}
+                            >
+                              {row.employeeNumber}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 4)}
+                              isHighlighted={isCellHighlighted(displayIndex, 4)}
+                              onClick={() => handleCellClick(displayIndex, 4)}
+                            >
+                              {row.startDate}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 5)}
+                              isHighlighted={isCellHighlighted(displayIndex, 5)}
+                              onClick={() => handleCellClick(displayIndex, 5)}
+                            >
+                              {row.endDate}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 6)}
+                              isHighlighted={isCellHighlighted(displayIndex, 6)}
+                              onClick={() => handleCellClick(displayIndex, 6)}
+                            >
+                              {row.name}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 7)}
+                              isHighlighted={isCellHighlighted(displayIndex, 7)}
+                              onClick={() => handleCellClick(displayIndex, 7)}
+                            >
+                              {row.position}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 8)}
+                              isHighlighted={isCellHighlighted(displayIndex, 8)}
+                              onClick={() => handleCellClick(displayIndex, 8)}
+                            >
+                              {row.rateNbc594}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 9)}
+                              isHighlighted={isCellHighlighted(displayIndex, 9)}
+                              onClick={() => handleCellClick(displayIndex, 9)}
+                            >
+                              {row.nbcDiffl597}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 10)}
+                              isHighlighted={isCellHighlighted(
+                                displayIndex,
+                                10
+                              )}
+                              onClick={() => handleCellClick(displayIndex, 10)}
+                            >
+                              {row.increment}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 11)}
+                              isHighlighted={isCellHighlighted(
+                                displayIndex,
+                                11
+                              )}
+                              onClick={() => handleCellClick(displayIndex, 11)}
+                            >
+                              {row.grossSalary}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 12)}
+                              isHighlighted={isCellHighlighted(
+                                displayIndex,
+                                12
+                              )}
+                              onClick={() => handleCellClick(displayIndex, 12)}
+                              sx={{ fontWeight: 'bold' }}
+                            >
+                              {row.abs}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 13)}
+                              isHighlighted={isCellHighlighted(
+                                displayIndex,
+                                13
+                              )}
+                              onClick={() => handleCellClick(displayIndex, 13)}
+                            >
+                              {row.h}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 14)}
+                              isHighlighted={isCellHighlighted(
+                                displayIndex,
+                                14
+                              )}
+                              onClick={() => handleCellClick(displayIndex, 14)}
+                            >
+                              {row.m}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 15)}
+                              isHighlighted={isCellHighlighted(
+                                displayIndex,
+                                15
+                              )}
+                              onClick={() => handleCellClick(displayIndex, 15)}
+                            >
+                              {row.netSalary}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 16)}
+                              isHighlighted={isCellHighlighted(
+                                displayIndex,
+                                16
+                              )}
+                              onClick={() => handleCellClick(displayIndex, 16)}
+                            >
+                              {row.withholdingTax}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 17)}
+                              isHighlighted={isCellHighlighted(
+                                displayIndex,
+                                17
+                              )}
+                              onClick={() => handleCellClick(displayIndex, 17)}
+                            >
+                              {row.totalGsisDeds}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 18)}
+                              isHighlighted={isCellHighlighted(
+                                displayIndex,
+                                18
+                              )}
+                              onClick={() => handleCellClick(displayIndex, 18)}
+                            >
+                              {row.totalPagibigDeds}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 19)}
+                              isHighlighted={isCellHighlighted(
+                                displayIndex,
+                                19
+                              )}
+                              onClick={() => handleCellClick(displayIndex, 19)}
+                            >
+                              {row.PhilHealthContribution}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 20)}
+                              isHighlighted={isCellHighlighted(
+                                displayIndex,
+                                20
+                              )}
+                              onClick={() => handleCellClick(displayIndex, 20)}
+                            >
+                              {row.totalOtherDeds}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 21)}
+                              isHighlighted={isCellHighlighted(
+                                displayIndex,
+                                21
+                              )}
+                              onClick={() => handleCellClick(displayIndex, 21)}
+                            >
+                              {row.totalDeductions}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 22)}
+                              isHighlighted={isCellHighlighted(
+                                displayIndex,
+                                22
+                              )}
+                              onClick={() => handleCellClick(displayIndex, 22)}
+                              sx={{ color: 'red', fontWeight: 'bold' }}
+                            >
+                              {row.pay1st}
+                            </ExcelCell>
+                            <ExcelCell
+                              isSelected={isCellSelected(displayIndex, 23)}
+                              isHighlighted={isCellHighlighted(
+                                displayIndex,
+                                23
+                              )}
+                              onClick={() => handleCellClick(displayIndex, 23)}
+                              sx={{ color: 'red', fontWeight: 'bold' }}
+                            >
+                              {row.pay2nd}
+                            </ExcelCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </Box>
+            </Box>
           </Box>
-        </Box>
-      </Modal>
+        </Modal>
 
-      {/* Loading and Success Overlays */}
-      <LoadingOverlay open={loading} message="Processing..." />
-      <SuccessfulOverlay
-        open={successOpen}
-        action={successAction}
-        onClose={() => setSuccessOpen(false)}
-      />
-    </Container>
+        <LoadingOverlay open={loading} message="Processing..." />
+        <SuccessfulOverlay
+          open={successOpen}
+          action={successAction}
+          onClose={() => setSuccessOpen(false)}
+        />
+      </Box>
+    </Box>
   );
 };
 

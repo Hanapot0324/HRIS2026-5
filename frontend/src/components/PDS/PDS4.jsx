@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import PrintIcon from '@mui/icons-material/Print'
+import PrintIcon from '@mui/icons-material/Print';
+import { Box, Container, CircularProgress, Typography } from '@mui/material';
+import AccessDenied from '../AccessDenied';
+import usePageAccess from '../../hooks/usePageAccess';
 
 
 
@@ -12,6 +15,11 @@ const PDS4 = () => {
     const [role, setRole] = useState("");
     const [employeeNumber, setEmployeeNumber] = useState(""); // State for employee number
 
+    //ACCESSING
+    // Dynamic page access control using component identifier
+    // The identifier 'pds4' should match the component_identifier in the pages table
+    const { hasAccess, loading: accessLoading, error: accessError } = usePageAccess('pds4');
+    // ACCESSING END
 
       useEffect(() => {
       
@@ -35,8 +43,40 @@ const PDS4 = () => {
     
       }, [navigate]);
 
-    return (
+    // ACCESSING 2
+    // Loading state
+    if (accessLoading) {
+      return (
+        <Container maxWidth="md" sx={{ py: 8 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            }}
+          >
+            <CircularProgress sx={{ color: '#6d2323', mb: 2 }} />
+            <Typography variant="h6" sx={{ color: '#6d2323' }}>
+              Loading access information...
+            </Typography>
+          </Box>
+        </Container>
+      );
+    }
+    // Access denied state - Now using the reusable component
+    if (hasAccess === false) {
+      return (
+        <AccessDenied
+          title="Access Denied"
+          message="You do not have permission to access Personal Data Sheet (PDS4). Contact your administrator to request access."
+          returnPath="/admin-home"
+          returnButtonText="Return to Home"
+        />
+      );
+    }
+    //ACCESSING END2
 
+    return (
       <div id="print-section">
 
      <style>

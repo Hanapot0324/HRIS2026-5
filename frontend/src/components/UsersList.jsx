@@ -352,7 +352,10 @@ const UsersList = () => {
           ? accessDataRaw
           : accessDataRaw.data || [];
         const accessMap = (accessData || []).reduce((acc, curr) => {
-          acc[curr.page_id] = String(curr.page_privilege) === "1";
+          // Check if page_privilege indicates any level of access (not "0" or empty)
+          // Privileges like "1", "12", "2", etc. all indicate access
+          const privilege = String(curr.page_privilege || "0");
+          acc[curr.page_id] = privilege !== "0" && privilege !== "";
           return acc;
         }, {});
 
@@ -437,7 +440,10 @@ const UsersList = () => {
             ? accessDataRaw
             : accessDataRaw.data || [];
           const accessMap = (accessData || []).reduce((acc, curr) => {
-            acc[curr.page_id] = String(curr.page_privilege) === "1";
+            // Check if page_privilege indicates any level of access (not "0" or empty)
+            // Privileges like "1", "12", "2", etc. all indicate access
+            const privilege = String(curr.page_privilege || "0");
+            acc[curr.page_id] = privilege !== "0" && privilege !== "";
             return acc;
           }, {});
           setPageAccess(accessMap);
