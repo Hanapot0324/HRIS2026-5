@@ -58,7 +58,12 @@ import CircularProgress from '@mui/material/CircularProgress';
 // Helper function to convert hex to rgb
 const hexToRgb = (hex) => {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '109, 35, 35';
+  return result
+    ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(
+        result[3],
+        16
+      )}`
+    : '109, 35, 35';
 };
 
 // Styled components - colors will be applied via sx prop
@@ -72,23 +77,29 @@ const GlassCard = styled(Card)(({ theme }) => ({
   },
 }));
 
-const ProfessionalButton = styled(Button)(({ theme, variant, color = 'primary' }) => ({
-  borderRadius: 12,
-  fontWeight: 600,
-  padding: '12px 24px',
-  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-  textTransform: 'none',
-  fontSize: '0.95rem',
-  letterSpacing: '0.025em',
-  boxShadow: variant === 'contained' ? '0 4px 14px rgba(254, 249, 225, 0.25)' : 'none',
-  '&:hover': {
-    transform: 'translateY(-2px)',
-    boxShadow: variant === 'contained' ? '0 6px 20px rgba(254, 249, 225, 0.35)' : 'none',
-  },
-  '&:active': {
-    transform: 'translateY(0)',
-  },
-}));
+const ProfessionalButton = styled(Button)(
+  ({ theme, variant, color = 'primary' }) => ({
+    borderRadius: 12,
+    fontWeight: 600,
+    padding: '12px 24px',
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    textTransform: 'none',
+    fontSize: '0.95rem',
+    letterSpacing: '0.025em',
+    boxShadow:
+      variant === 'contained' ? '0 4px 14px rgba(254, 249, 225, 0.25)' : 'none',
+    '&:hover': {
+      transform: 'translateY(-2px)',
+      boxShadow:
+        variant === 'contained'
+          ? '0 6px 20px rgba(254, 249, 225, 0.35)'
+          : 'none',
+    },
+    '&:active': {
+      transform: 'translateY(0)',
+    },
+  })
+);
 
 const ModernTextField = styled(TextField)(({ theme }) => ({
   '& .MuiOutlinedInput-root': {
@@ -136,7 +147,9 @@ const PremiumTableContainer = styled(TableContainer)(({ theme }) => ({
 const PremiumTableCell = styled(TableCell)(({ theme, isHeader = false }) => ({
   fontWeight: isHeader ? 600 : 500,
   padding: '18px 20px',
-  borderBottom: isHeader ? '2px solid rgba(254, 249, 225, 0.5)' : '1px solid rgba(109, 35, 35, 0.06)',
+  borderBottom: isHeader
+    ? '2px solid rgba(254, 249, 225, 0.5)'
+    : '1px solid rgba(109, 35, 35, 0.06)',
   fontSize: '0.95rem',
   letterSpacing: '0.025em',
   minWidth: '120px', // Ensure minimum width for cells
@@ -145,7 +158,7 @@ const PremiumTableCell = styled(TableCell)(({ theme, isHeader = false }) => ({
 
 const OfficialTimeForm = () => {
   const { settings } = useSystemSettings();
-  
+
   // Get colors from system settings
   const primaryColor = settings.accentColor || '#FEF9E1'; // Cards color
   const secondaryColor = settings.backgroundColor || '#FFF8E7'; // Background
@@ -322,63 +335,73 @@ const OfficialTimeForm = () => {
           <Close />
         </IconButton>
       </DialogTitle>
-        <PremiumTableContainer>
-          <Table 
-            stickyHeader 
-          >
-            <TableHead>
-              <TableRow sx={{ bgcolor: 'rgba(254, 249, 225, 0.7)' }}>
-                {[
-                  'Employee Number',
-                  'Day',
-                  'Time In',
-                  'Break In',
-                  'Break Out',
-                  'Time Out',
-                  'Honorarium Time In',
-                  'Honorarium Time Out',
-                  'Service Credit Time In',
-                  'Service Credit Time Out',
-                  'Over-Time In',
-                  'Over-Time Out',
-                ].map((header, i) => (
-                  <PremiumTableCell
-                    key={i}
-                    isHeader
-                    sx={{ color: accentColor }}
-                  >
-                    {header}
-                  </PremiumTableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {previewRecords.map((record, index) => (
-                <TableRow 
-                  key={index}
-                  sx={{ 
-                    '&:nth-of-type(even)': { bgcolor: 'rgba(254, 249, 225, 0.3)' },
-                    '&:hover': { bgcolor: 'rgba(109, 35, 35, 0.05)' },
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <PremiumTableCell>{record.employeeID}</PremiumTableCell>
-                  <PremiumTableCell>{record.day}</PremiumTableCell>
-                  <PremiumTableCell>{record.officialTimeIN}</PremiumTableCell>
-                  <PremiumTableCell>{record.officialBreaktimeIN}</PremiumTableCell>
-                  <PremiumTableCell>{record.officialBreaktimeOUT}</PremiumTableCell>
-                  <PremiumTableCell>{record.officialTimeOUT}</PremiumTableCell>
-                  <PremiumTableCell>{record.officialHonorariumTimeIN}</PremiumTableCell>
-                  <PremiumTableCell>{record.officialHonorariumTimeOUT}</PremiumTableCell>
-                  <PremiumTableCell>{record.officialServiceCreditTimeIN}</PremiumTableCell>
-                  <PremiumTableCell>{record.officialServiceCreditTimeOUT}</PremiumTableCell>
-                  <PremiumTableCell>{record.officialOverTimeIN}</PremiumTableCell>
-                  <PremiumTableCell>{record.officialOverTimeOUT}</PremiumTableCell>
-                </TableRow>
+      <PremiumTableContainer>
+        <Table stickyHeader>
+          <TableHead>
+            <TableRow sx={{ bgcolor: 'rgba(254, 249, 225, 0.7)' }}>
+              {[
+                'Employee Number',
+                'Day',
+                'Time In',
+                'Break In',
+                'Break Out',
+                'Time Out',
+                'Honorarium Time In',
+                'Honorarium Time Out',
+                'Service Credit Time In',
+                'Service Credit Time Out',
+                'Over-Time In',
+                'Over-Time Out',
+              ].map((header, i) => (
+                <PremiumTableCell key={i} isHeader sx={{ color: accentColor }}>
+                  {header}
+                </PremiumTableCell>
               ))}
-            </TableBody>
-          </Table>
-        </PremiumTableContainer>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {previewRecords.map((record, index) => (
+              <TableRow
+                key={index}
+                sx={{
+                  '&:nth-of-type(even)': {
+                    bgcolor: 'rgba(254, 249, 225, 0.3)',
+                  },
+                  '&:hover': { bgcolor: 'rgba(109, 35, 35, 0.05)' },
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <PremiumTableCell>{record.employeeID}</PremiumTableCell>
+                <PremiumTableCell>{record.day}</PremiumTableCell>
+                <PremiumTableCell>{record.officialTimeIN}</PremiumTableCell>
+                <PremiumTableCell>
+                  {record.officialBreaktimeIN}
+                </PremiumTableCell>
+                <PremiumTableCell>
+                  {record.officialBreaktimeOUT}
+                </PremiumTableCell>
+                <PremiumTableCell>{record.officialTimeOUT}</PremiumTableCell>
+                <PremiumTableCell>
+                  {record.officialHonorariumTimeIN}
+                </PremiumTableCell>
+                <PremiumTableCell>
+                  {record.officialHonorariumTimeOUT}
+                </PremiumTableCell>
+                <PremiumTableCell>
+                  {record.officialServiceCreditTimeIN}
+                </PremiumTableCell>
+                <PremiumTableCell>
+                  {record.officialServiceCreditTimeOUT}
+                </PremiumTableCell>
+                <PremiumTableCell>{record.officialOverTimeIN}</PremiumTableCell>
+                <PremiumTableCell>
+                  {record.officialOverTimeOUT}
+                </PremiumTableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </PremiumTableContainer>
       <DialogActions
         sx={{
           backgroundColor: '#FEF9E1',
@@ -394,7 +417,7 @@ const OfficialTimeForm = () => {
             color: primaryColor,
             '&:hover': {
               backgroundColor: accentDark,
-            }
+            },
           }}
         >
           Close
@@ -487,24 +510,28 @@ const OfficialTimeForm = () => {
     <>
       {/* LoadingOverlay - Now outside everything to cover full page */}
       <LoadingOverlay open={loading} message="Processing..." />
-      
-      <Box sx={{ 
-        py: 4,
-        borderRadius: '14px',
-        width: '100vw', // Full viewport width
-        mx: 'auto', // Center horizontally
-        maxWidth: '100%', // Ensure it doesn't exceed viewport
-        overflow: 'hidden', // Prevent horizontal scroll
-        position: 'relative',
-        left: '50%',
-        transform: 'translateX(-50%)', // Center the element
-      }}>
+
+      <Box
+        sx={{
+          py: 4,
+          borderRadius: '14px',
+          width: '100vw', // Full viewport width
+          mx: 'auto', // Center horizontally
+          maxWidth: '100%', // Ensure it doesn't exceed viewport
+          overflow: 'hidden', // Prevent horizontal scroll
+          position: 'relative',
+          left: '50%',
+          transform: 'translateX(-50%)', // Center the element
+        }}
+      >
         {/* Wider Container */}
         <Box sx={{ px: 6, mx: 'auto', maxWidth: '1600px' }}>
           {/* Header */}
           <Fade in timeout={500}>
             <Box sx={{ mb: 4 }}>
-              <GlassCard sx={{border: `1px solid ${alpha(accentColor, 0.1)}`}}>
+              <GlassCard
+                sx={{ border: `1px solid ${alpha(accentColor, 0.1)}` }}
+              >
                 <Box
                   sx={{
                     p: 5,
@@ -522,7 +549,8 @@ const OfficialTimeForm = () => {
                       right: -50,
                       width: 200,
                       height: 200,
-                      background: 'radial-gradient(circle, rgba(109,35,35,0.1) 0%, rgba(109,35,35,0) 70%)',
+                      background:
+                        'radial-gradient(circle, rgba(109,35,35,0.1) 0%, rgba(109,35,35,0) 70%)',
                     }}
                   />
                   <Box
@@ -532,57 +560,81 @@ const OfficialTimeForm = () => {
                       left: '30%',
                       width: 150,
                       height: 150,
-                      background: 'radial-gradient(circle, rgba(109,35,35,0.08) 0%, rgba(109,35,35,0) 70%)',
+                      background:
+                        'radial-gradient(circle, rgba(109,35,35,0.08) 0%, rgba(109,35,35,0) 70%)',
                     }}
                   />
-                  
-                  <Box display="flex" alignItems="center" justifyContent="space-between" position="relative" zIndex={1}>
+
+                  <Box
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    position="relative"
+                    zIndex={1}
+                  >
                     <Box display="flex" alignItems="center">
-                      <Avatar 
-                        sx={{ 
-                          bgcolor: 'rgba(109,35,35,0.15)', 
-                          mr: 4, 
-                          width: 64, 
+                      <Avatar
+                        sx={{
+                          bgcolor: 'rgba(109,35,35,0.15)',
+                          mr: 4,
+                          width: 64,
                           height: 64,
-                          boxShadow: '0 8px 24px rgba(109,35,35,0.15)'
+                          boxShadow: '0 8px 24px rgba(109,35,35,0.15)',
                         }}
                       >
-                        <Schedule sx={{color: accentColor, fontSize: 32 }} />
+                        <Schedule sx={{ color: accentColor, fontSize: 32 }} />
                       </Avatar>
                       <Box>
-                        <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1, lineHeight: 1.2, color: accentColor }}>
+                        <Typography
+                          variant="h4"
+                          component="h1"
+                          sx={{
+                            fontWeight: 700,
+                            mb: 1,
+                            lineHeight: 1.2,
+                            color: accentColor,
+                          }}
+                        >
                           Official Time Schedule
                         </Typography>
-                        <Typography variant="body1" sx={{ opacity: 0.8, fontWeight: 400, color: accentDark }}>
-                          Manage and update official time schedules for employees
+                        <Typography
+                          variant="body1"
+                          sx={{
+                            opacity: 0.8,
+                            fontWeight: 400,
+                            color: accentDark,
+                          }}
+                        >
+                          Manage and update official time schedules for
+                          employees
                         </Typography>
                       </Box>
                     </Box>
                     <Box display="flex" alignItems="center" gap={2}>
-                      <Chip 
-                        label="System Generated" 
-                        size="small" 
-                        sx={{ 
-                          bgcolor: 'rgba(109,35,35,0.15)', 
+                      <Chip
+                        label="System Generated"
+                        size="small"
+                        sx={{
+                          bgcolor: 'rgba(109,35,35,0.15)',
                           color: accentColor,
                           fontWeight: 500,
-                          '& .MuiChip-label': { px: 1 }
-                        }} 
+                          '& .MuiChip-label': { px: 1 },
+                        }}
                       />
                       <Tooltip title="Refresh Data">
-                        <IconButton 
+                        <IconButton
                           onClick={handleSearch}
                           disabled={!employeeID}
-                          sx={{ 
-                            bgcolor: 'rgba(109,35,35,0.1)', 
+                          sx={{
+                            bgcolor: 'rgba(109,35,35,0.1)',
                             '&:hover': { bgcolor: 'rgba(109,35,35,0.2)' },
                             color: accentColor,
                             width: 48,
                             height: 48,
-                            '&:disabled': { 
+                            '&:disabled': {
                               bgcolor: 'rgba(109,35,35,0.05)',
-                              color: 'rgba(109,35,35,0.3)'
-                            }
+                              color: 'rgba(109,35,35,0.3)',
+                            },
                           }}
                         >
                           <SearchIcon />
@@ -597,30 +649,52 @@ const OfficialTimeForm = () => {
 
           {/* Controls */}
           <Fade in timeout={700}>
-            <GlassCard sx={{ mb: 4, border: `1px solid ${alpha(accentColor, 0.1)}` }}>
+            <GlassCard
+              sx={{ mb: 4, border: `1px solid ${alpha(accentColor, 0.1)}` }}
+            >
               <CardHeader
                 title={
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Avatar sx={{ bgcolor: alpha(primaryColor, 0.8), color: accentColor }}>
+                    <Avatar
+                      sx={{
+                        bgcolor: alpha(primaryColor, 0.8),
+                        color: accentColor,
+                      }}
+                    >
                       <FilterList />
                     </Avatar>
                     <Box>
-                      <Typography variant="body2" color="text.secondary" sx={{ color: accentDark }}>
-                        Search for employee or upload Excel file with time schedules
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ color: accentDark }}
+                      >
+                        Search for employee or upload Excel file with time
+                        schedules
                       </Typography>
                     </Box>
                   </Box>
                 }
-                sx={{ 
-                  bgcolor: alpha(primaryColor, 0.5), 
+                sx={{
+                  bgcolor: alpha(primaryColor, 0.5),
                   pb: 2,
-                  borderBottom: '1px solid rgba(109,35,35,0.1)'
+                  borderBottom: '1px solid rgba(109,35,35,0.1)',
                 }}
               />
               <CardContent sx={{ p: 4 }}>
                 <Grid container spacing={4}>
                   <Grid item xs={12} md={6}>
-                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: accentColor, display: 'flex', alignItems: 'center', mb: 3 }}>
+                    <Typography
+                      variant="h6"
+                      gutterBottom
+                      sx={{
+                        fontWeight: 600,
+                        color: accentColor,
+                        display: 'flex',
+                        alignItems: 'center',
+                        mb: 3,
+                      }}
+                    >
                       <Person sx={{ mr: 2, fontSize: 24 }} />
                       Employee Search
                     </Typography>
@@ -665,7 +739,17 @@ const OfficialTimeForm = () => {
                     </Box>
                   </Grid>
                   <Grid item xs={12} md={6}>
-                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: accentColor, display: 'flex', alignItems: 'center', mb: 3 }}>
+                    <Typography
+                      variant="h6"
+                      gutterBottom
+                      sx={{
+                        fontWeight: 600,
+                        color: accentColor,
+                        display: 'flex',
+                        alignItems: 'center',
+                        mb: 3,
+                      }}
+                    >
                       <UploadFile sx={{ mr: 2, fontSize: 24 }} />
                       File Upload
                     </Typography>
@@ -689,14 +773,21 @@ const OfficialTimeForm = () => {
                               color: accentColor,
                               '&:hover': {
                                 backgroundColor: alpha(accentColor, 0.1),
-                              }
+                              },
                             }}
                           >
                             Choose File
                           </ProfessionalButton>
                         </label>
                         {file && (
-                          <Box sx={{ mt: 2, p: 2, bgcolor: alpha(accentColor, 0.1), borderRadius: 2 }}>
+                          <Box
+                            sx={{
+                              mt: 2,
+                              p: 2,
+                              bgcolor: alpha(accentColor, 0.1),
+                              borderRadius: 2,
+                            }}
+                          >
                             <Typography variant="body2" color={accentColor}>
                               Selected: {file.name}
                             </Typography>
@@ -725,43 +816,66 @@ const OfficialTimeForm = () => {
           {/* Results */}
           {records.length > 0 && (
             <Fade in={!loading} timeout={500}>
-              <GlassCard sx={{ mb: 4, border: `1px solid ${alpha(accentColor, 0.1)}` }}>
-                <Box sx={{ 
-                  p: 4, 
-                  background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`, 
-                  color: accentColor,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}>
+              <GlassCard
+                sx={{ mb: 4, border: `1px solid ${alpha(accentColor, 0.1)}` }}
+              >
+                <Box
+                  sx={{
+                    p: 4,
+                    background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`,
+                    color: accentColor,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
                   <Box>
-                    <Typography variant="body2" sx={{ opacity: 0.8, mb: 1, textTransform: 'uppercase', letterSpacing: '0.1em', color: accentDark }}>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        opacity: 0.8,
+                        mb: 1,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.1em',
+                        color: accentDark,
+                      }}
+                    >
                       Time Schedule for Employee Number
                     </Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 600, mb: 1, color: accentColor }}>
+                    <Typography
+                      variant="h4"
+                      sx={{ fontWeight: 600, mb: 1, color: accentColor }}
+                    >
                       {employeeID}
                     </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2 }}>
-                      <Chip 
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 2,
+                        mt: 2,
+                      }}
+                    >
+                      <Chip
                         icon={<AccessTime />}
-                        label={found ? "Existing Schedule" : "New Schedule"}
+                        label={found ? 'Existing Schedule' : 'New Schedule'}
                         size="small"
-                        sx={{ 
-                          bgcolor: 'rgba(109,35,35,0.15)', 
+                        sx={{
+                          bgcolor: 'rgba(109,35,35,0.15)',
                           color: accentColor,
-                          fontWeight: 500
-                        }} 
+                          fontWeight: 500,
+                        }}
                       />
                     </Box>
                   </Box>
-                  <Avatar 
-                    sx={{ 
-                      bgcolor: 'rgba(109,35,35,0.15)', 
-                      width: 80, 
+                  <Avatar
+                    sx={{
+                      bgcolor: 'rgba(109,35,35,0.15)',
+                      width: 80,
                       height: 80,
                       fontSize: '2rem',
                       fontWeight: 600,
-                      color: accentColor
+                      color: accentColor,
                     }}
                   >
                     <Schedule />
@@ -770,9 +884,9 @@ const OfficialTimeForm = () => {
 
                 <Box component="form" onSubmit={handleSubmit} sx={{ p: 2 }}>
                   <PremiumTableContainer>
-                    <Table 
-                      stickyHeader 
-                      sx={{ 
+                    <Table
+                      stickyHeader
+                      sx={{
                         minWidth: '1400px', // Set minimum width to ensure horizontal scrolling
                       }}
                     >
@@ -804,12 +918,14 @@ const OfficialTimeForm = () => {
                       </TableHead>
                       <TableBody>
                         {records.map((record, index) => (
-                          <TableRow 
+                          <TableRow
                             key={index}
-                            sx={{ 
-                              '&:nth-of-type(even)': { bgcolor: 'rgba(254, 249, 225, 0.3)' },
+                            sx={{
+                              '&:nth-of-type(even)': {
+                                bgcolor: 'rgba(254, 249, 225, 0.3)',
+                              },
                               '&:hover': { bgcolor: 'rgba(109, 35, 35, 0.05)' },
-                              transition: 'all 0.2s ease'
+                              transition: 'all 0.2s ease',
                             }}
                           >
                             <PremiumTableCell>
@@ -834,7 +950,11 @@ const OfficialTimeForm = () => {
                                 size="small"
                                 value={record.officialTimeIN}
                                 onChange={(e) =>
-                                  handleChange(index, 'officialTimeIN', e.target.value)
+                                  handleChange(
+                                    index,
+                                    'officialTimeIN',
+                                    e.target.value
+                                  )
                                 }
                               />
                             </PremiumTableCell>
@@ -872,7 +992,11 @@ const OfficialTimeForm = () => {
                                 size="small"
                                 value={record.officialTimeOUT}
                                 onChange={(e) =>
-                                  handleChange(index, 'officialTimeOUT', e.target.value)
+                                  handleChange(
+                                    index,
+                                    'officialTimeOUT',
+                                    e.target.value
+                                  )
                                 }
                               />
                             </PremiumTableCell>
@@ -966,7 +1090,9 @@ const OfficialTimeForm = () => {
                     </Table>
                   </PremiumTableContainer>
 
-                  <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+                  <Box
+                    sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}
+                  >
                     <ProfessionalButton
                       type="submit"
                       variant="contained"
@@ -975,7 +1101,6 @@ const OfficialTimeForm = () => {
                         py: 2,
                         px: 6,
                         fontSize: '1rem',
-                        ...saveButtonStyles
                       }}
                     >
                       {found ? 'Update' : 'Save'}
@@ -988,7 +1113,7 @@ const OfficialTimeForm = () => {
 
           {/* Modal */}
           <PreviewModal />
-          
+
           {/* Success Overlay */}
           <SuccessfulOverlay open={successOpen} action={successAction} />
         </Box>

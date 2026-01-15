@@ -94,6 +94,9 @@ import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import BusinessIcon from '@mui/icons-material/Business';
 import DescriptionIcon from '@mui/icons-material/Description';
 import TimelineIcon from '@mui/icons-material/Timeline';
+import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
+import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
+import CameraAltIcon from '@mui/icons-material/CameraAlt';
 
 const colors = {
   primary: '#6D2323',
@@ -120,20 +123,134 @@ const shadows = {
   colored: '0 4px 16px rgba(109, 35, 35, 0.2)',
 };
 
-const ProfileContainer = styled(Container)(({ theme }) => ({
-  maxWidth: '1600px',
-  paddingTop: theme.spacing(4),
-  paddingBottom: theme.spacing(8),
-  minHeight: '100vh',
-  backgroundColor: colors.background,
+// --- NEW LAYOUT STYLES ---
+
+export const ProfileWrapper = styled(Box)`
+  width: 100%;
+  max-width: 1200px; /* center it like a website */
+  min-height: 8vh;
+  margin: 20px auto; /* center and add spacing */
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+
+  /* Glass + Shadow */
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(15px);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+
+  /* Optional glare hover */
+  position: relative;
+  &:hover::before {
+    transform: rotate(25deg) translateX(100%);
+  }
+  &::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+      60deg,
+      rgba(255, 255, 255, 0.05) 0%,
+      rgba(255, 255, 255, 0.1) 50%,
+      rgba(255, 255, 255, 0.05) 100%
+    );
+    transform: rotate(25deg) translateX(-100%);
+    transition: transform 0.7s ease;
+    border-radius: 16px;
+  }
+`;
+
+// Top Navigation Bar Container
+const ProfileAppBar = styled(AppBar)(({ theme }) => ({
+  backgroundColor: colors.surface,
+  color: colors.textPrimary,
+  boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+  borderBottom: '1px solid #E5E5E5',
+  padding: '0 24px',
   position: 'relative',
+  zIndex: 1100,
 }));
+
+export const ProfileToolbar = styled(Toolbar)`
+  min-height: 80px; /* ← increase this (64 default) */
+  padding-top: 12px;
+  padding-bottom: 12px;
+
+  display: flex;
+  align-items: center;
+`;
+
+const BrandSection = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  gap: theme.spacing(2),
+  flex: 1,
+}));
+
+const ProfileInfoCompact = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  flexDirection: 'column',
+  marginLeft: theme.spacing(1),
+}));
+
+const NavTabsContainer = styled(Box)(({ theme }) => ({
+  backgroundColor: colors.background,
+  borderBottom: '1px solid #E5E5E5',
+  width: '100%',
+  zIndex: 1090,
+}));
+
+const NavTabs = styled(Tabs)(({ theme }) => ({
+  minHeight: '50px',
+  '& .MuiTabs-indicator': {
+    backgroundColor: colors.primary,
+    height: '3px',
+    borderRadius: '3px 3px 0 0',
+  },
+  '& .MuiTab-root': {
+    textTransform: 'none',
+    fontWeight: 600,
+    fontSize: '0.9rem',
+    color: colors.textSecondary,
+    minHeight: '50px',
+    minWidth: 'auto',
+    padding: '12px 20px',
+    transition: 'color 0.2s ease',
+    '&:hover': {
+      color: colors.primary,
+      backgroundColor: alpha(colors.primary, 0.04),
+    },
+    '&.Mui-selected': {
+      color: colors.primary,
+    },
+  },
+}));
+
+// Main Content Area (replaces MainContent, adjusted for no sidebar)
+export const MainContent = styled(Box)`
+  flex: 1;
+  width: 100%;
+  max-width: 1600px; /* adjust if you want */
+  margin: 0 auto; /* center */
+
+  padding: 24px;
+
+  box-sizing: border-box;
+`;
+
+// --- EXISTING STYLES (Kept for content consistency) ---
 
 const ProfileHeader = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(4),
   marginBottom: theme.spacing(4),
   borderRadius: theme.spacing(3),
   boxShadow: shadows.medium,
+
   display: 'flex',
   alignItems: 'center',
   position: 'relative',
@@ -143,28 +260,6 @@ const ProfileHeader = styled(Paper)(({ theme }) => ({
     flexDirection: 'column',
     textAlign: 'center',
     padding: theme.spacing(3),
-  },
-}));
-
-const ProfileAvatarContainer = styled(Box)(({ theme }) => ({
-  marginRight: theme.spacing(4),
-  position: 'relative',
-  [theme.breakpoints.down('md')]: {
-    marginRight: 0,
-    marginBottom: theme.spacing(3),
-  },
-}));
-
-const ProfileAvatar = styled(Avatar)(({ theme }) => ({
-  width: theme.spacing(20),
-  height: theme.spacing(20),
-  border: `4px solid ${colors.surface}`,
-  boxShadow: shadows.medium,
-  cursor: 'pointer',
-  transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-  '&:hover': {
-    transform: 'scale(1.05)',
-    boxShadow: shadows.colored,
   },
 }));
 
@@ -245,21 +340,240 @@ const InfoItem = styled(Box)(({ theme }) => ({
   },
 }));
 
-const InfoLabel = styled(Typography)(({ theme }) => ({
-  fontWeight: 600,
-  color: colors.textSecondary,
-  minWidth: '140px',
-  marginRight: theme.spacing(2),
+const PageHeaderBox = styled(Box)(({ theme }) => ({
   display: 'flex',
+  justifyContent: 'space-between',
   alignItems: 'center',
-  gap: theme.spacing(1),
+  background: colors.surface,
+  border: '1px solid #E5E5E5',
+  borderRadius: '12px',
+  padding: '20px 30px',
+  marginBottom: '30px',
+  boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
+  [theme.breakpoints.down('sm')]: {
+    flexDirection: 'column',
+    gap: theme.spacing(2),
+    alignItems: 'flex-start',
+  },
+}));
+
+const HeaderTitles = styled(Box)(({ theme }) => ({}));
+
+const HeaderTitle = styled(Typography)(({ theme }) => ({
+  fontSize: '1.6rem',
+  color: colors.primary,
+  fontWeight: 800,
+  marginBottom: '4px',
+  letterSpacing: '-0.5px',
+}));
+
+const HeaderSubtitle = styled(Typography)(({ theme }) => ({
+  fontSize: '0.9rem',
+  color: colors.textSecondary,
+  fontWeight: 500,
+}));
+
+const NavControls = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  gap: '10px',
+}));
+
+const NavButton = styled(IconButton)(({ theme }) => ({
+  background: 'rgba(255, 255, 255, 0.2)', // semi-transparent glass
+  backdropFilter: 'blur(8px)', // glass blur effect
+  border: '1px solid rgba(255, 255, 255, 0.3)',
+  color: colors.textPrimary,
+  width: '44px',
+  height: '44px',
+  borderRadius: '12px', // rounded for modern look
+  boxShadow: '0 4px 12px rgba(0,0,0,0.08)', // soft shadow
+  position: 'relative',
+  overflow: 'hidden',
+  transition: 'all 0.3s ease',
+
+  '&:hover': {
+    color: colors.primary,
+    transform: 'translateY(-2px)',
+    boxShadow: '0 6px 18px rgba(0,0,0,0.2)',
+  },
+
+  '&:disabled': {
+    opacity: 0.4,
+    cursor: 'not-allowed',
+    transform: 'none',
+    boxShadow: 'none',
+  },
+
+  // Glare hover effect
+  '&::before': {
+    content: '""',
+    position: 'absolute',
+    top: '-50%',
+    left: '-50%',
+    width: '200%',
+    height: '200%',
+    background:
+      'linear-gradient(60deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 100%)',
+    transform: 'rotate(25deg) translateX(-100%)',
+    transition: 'transform 0.7s ease',
+  },
+  '&:hover::before': {
+    transform: 'rotate(25deg) translateX(100%)',
+  },
+}));
+
+const DataCard = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'mouseX' && prop !== 'mouseY',
+})(({ theme, mouseX, mouseY }) => ({
+  background: colors.surface,
+  border: '1px solid #f0f0f0',
+  borderRadius: '12px',
+  padding: '30px',
+  marginBottom: '20px',
+  position: 'relative',
+  boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
+  overflow: 'hidden',
+  transition: 'transform 0.1s ease',
+  '&::before': {
+    content: '""',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: '12px',
+    padding: '1px',
+    background:
+      mouseX && mouseY
+        ? `radial-gradient(800px circle at ${mouseX}px ${mouseY}px, ${colors.primaryLight}, transparent 40%)`
+        : 'transparent',
+    WebkitMask:
+      'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+    mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+    WebkitMaskComposite: 'xor',
+    maskComposite: 'exclude',
+    pointerEvents: 'none',
+    zIndex: 2,
+    opacity: mouseX ? 1 : 0,
+    transition: 'opacity 0.3s ease',
+  },
+  '&::after': {
+    content: '""',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: '12px',
+    background:
+      mouseX && mouseY
+        ? `radial-gradient(800px circle at ${mouseX}px ${mouseY}px, rgba(109, 35, 35, 0.05), transparent 50%)`
+        : 'transparent',
+    pointerEvents: 'none',
+    zIndex: 1,
+    opacity: mouseX ? 1 : 0,
+    transition: 'opacity 0.3s ease',
+  },
+}));
+
+const CardInner = styled(Box)(({ theme }) => ({
+  position: 'relative',
+  zIndex: 2,
+}));
+
+const InfoGrid = styled(Box)(({ theme }) => ({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+  gap: '30px',
+  [theme.breakpoints.down('sm')]: {
+    gridTemplateColumns: '1fr',
+    gap: '20px',
+  },
+}));
+
+const InfoGroup = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  flexDirection: 'column',
+}));
+
+const InfoLabel = styled(Typography)(({ theme }) => ({
+  fontSize: '0.75rem',
+  textTransform: 'uppercase',
+  letterSpacing: '1px',
+  color: colors.textSecondary,
+  fontWeight: 700,
+  marginBottom: '6px',
 }));
 
 const InfoValue = styled(Typography)(({ theme }) => ({
+  fontSize: '1rem',
   color: colors.textPrimary,
-  flex: 1,
   fontWeight: 500,
+}));
+
+const Timeline = styled(Box)(({ theme }) => ({
+  position: 'relative',
+  paddingLeft: '20px',
+  '&::before': {
+    content: '""',
+    position: 'absolute',
+    left: 0,
+    top: '5px',
+    bottom: 0,
+    width: '2px',
+    background: '#eee',
+  },
+}));
+
+const TimelineItem = styled(Box)(({ theme }) => ({
+  position: 'relative',
+  paddingBottom: '30px',
+  '&::before': {
+    content: '""',
+    position: 'absolute',
+    left: '-25px',
+    top: '6px',
+    width: '12px',
+    height: '12px',
+    background: colors.surface,
+    border: `3px solid ${colors.primary}`,
+    borderRadius: '50%',
+    zIndex: 1,
+  },
+}));
+
+const TimelineDate = styled(Typography)(({ theme }) => ({
+  fontSize: '0.85rem',
+  color: colors.primary,
+  fontWeight: 700,
+  marginBottom: '5px',
+}));
+
+const TimelineTitle = styled(Typography)(({ theme }) => ({
+  fontSize: '1.1rem',
+  fontWeight: 700,
+  marginBottom: '2px',
+  color: colors.textPrimary,
+}));
+
+const TimelineOrg = styled(Typography)(({ theme }) => ({
   fontSize: '0.95rem',
+  color: colors.textSecondary,
+}));
+
+const ContentSection = styled(Box)(({ theme, active }) => ({
+  display: active ? 'block' : 'none',
+  animation: active ? 'fade 0.3s ease' : 'none',
+  '@keyframes fade': {
+    from: {
+      opacity: 0,
+      transform: 'translateY(10px)',
+    },
+    to: {
+      opacity: 1,
+      transform: 'translateY(0)',
+    },
+  },
 }));
 
 const TabContainer = styled(Box)(({ theme }) => ({
@@ -801,65 +1115,6 @@ const StickyActionBar = styled(Box)(({ theme }) => ({
   boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
 }));
 
-const Sidebar = styled(Paper)(({ theme }) => ({
-  padding: theme.spacing(2),
-  borderRadius: theme.spacing(2),
-  boxShadow: shadows.light,
-  height: 'fit-content',
-  position: 'sticky',
-  top: theme.spacing(2),
-  [theme.breakpoints.down('lg')]: {
-    marginBottom: theme.spacing(3),
-    position: 'relative',
-  },
-}));
-
-const MainContent = styled(Box)(({ theme }) => ({
-  flex: 1,
-}));
-
-const CategoryCard = styled(Card)(({ theme }) => ({
-  padding: theme.spacing(2),
-  marginBottom: theme.spacing(2),
-  borderRadius: theme.spacing(2),
-  cursor: 'pointer',
-  transition: 'all 0.2s ease',
-  border: '1px solid #e0e0e0',
-  '&:hover': {
-    boxShadow: shadows.medium,
-    transform: 'translateY(-2px)',
-    borderColor: colors.primary,
-  },
-  '&.active': {
-    backgroundColor: alpha(colors.primary, 0.1),
-    borderColor: colors.primary,
-  },
-}));
-
-const CategoryIcon = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  width: theme.spacing(5),
-  height: theme.spacing(5),
-  borderRadius: '50%',
-  backgroundColor: alpha(colors.primary, 0.1),
-  color: colors.primary,
-  marginRight: theme.spacing(2),
-}));
-
-const CategoryTitle = styled(Typography)(({ theme }) => ({
-  fontWeight: 600,
-  fontSize: '0.95rem',
-  color: colors.textPrimary,
-}));
-
-const CategoryDescription = styled(Typography)(({ theme }) => ({
-  fontSize: '0.8rem',
-  color: colors.textSecondary,
-  marginTop: theme.spacing(0.5),
-}));
-
 const TabPanel = styled(Box)(({ theme }) => ({
   padding: theme.spacing(2),
   borderRadius: theme.spacing(2),
@@ -952,30 +1207,42 @@ const PercentageInput = ({
 
 const Profile = () => {
   const theme = useTheme();
-  
-  const { person, profilePicture, loading, refresh: refreshPerson } = useProfileData();
-  const { sections, loading: sectionsLoading, refresh: refreshSections } = useProfileSections();
+
+  const {
+    person,
+    profilePicture,
+    loading,
+    refresh: refreshPerson,
+  } = useProfileData();
+  const {
+    sections,
+    loading: sectionsLoading,
+    refresh: refreshSections,
+  } = useProfileSections();
   const { saveProfile, saving } = useProfileMutations();
-  
+
   const userInfo = getUserInfo();
-  const employeeNumber = userInfo.employeeNumber || localStorage.getItem('employeeNumber');
-  
+  const employeeNumber =
+    userInfo.employeeNumber || localStorage.getItem('employeeNumber');
+
   const [uploadStatus, setUploadStatus] = useState({ message: '', type: '' });
   const [editOpen, setEditOpen] = useState(false);
   const [formData, setFormData] = useState({});
-  const [tabValue, setTabValue] = useState(0);
+  const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [imageZoomOpen, setImageZoomOpen] = useState(false);
   const [editImageZoomOpen, setEditImageZoomOpen] = useState(false);
   const [moreMenuAnchorEl, setMoreMenuAnchorEl] = useState(null);
   const [educationSubTabValue, setEducationSubTabValue] = useState(0);
   const profileRef = useRef(null);
+  const [cardMousePos, setCardMousePos] = useState({});
 
   const [childrenFormData, setChildrenFormData] = useState([]);
   const [collegesFormData, setCollegesFormData] = useState([]);
   const [graduatesFormData, setGraduatesFormData] = useState([]);
   const [eligibilitiesFormData, setEligibilitiesFormData] = useState([]);
-  const [learningDevelopmentFormData, setLearningDevelopmentFormData] = useState([]);
+  const [learningDevelopmentFormData, setLearningDevelopmentFormData] =
+    useState([]);
   const [otherInformationFormData, setOtherInformationFormData] = useState([]);
   const [vocationalFormData, setVocationalFormData] = useState([]);
   const [workExperiencesFormData, setWorkExperiencesFormData] = useState([]);
@@ -991,19 +1258,31 @@ const Profile = () => {
       if (sections.graduates.length > 0 && graduatesFormData.length === 0) {
         setGraduatesFormData(sections.graduates);
       }
-      if (sections.eligibilities.length > 0 && eligibilitiesFormData.length === 0) {
+      if (
+        sections.eligibilities.length > 0 &&
+        eligibilitiesFormData.length === 0
+      ) {
         setEligibilitiesFormData(sections.eligibilities);
       }
-      if (sections.learningDevelopment.length > 0 && learningDevelopmentFormData.length === 0) {
+      if (
+        sections.learningDevelopment.length > 0 &&
+        learningDevelopmentFormData.length === 0
+      ) {
         setLearningDevelopmentFormData(sections.learningDevelopment);
       }
-      if (sections.otherInformation.length > 0 && otherInformationFormData.length === 0) {
+      if (
+        sections.otherInformation.length > 0 &&
+        otherInformationFormData.length === 0
+      ) {
         setOtherInformationFormData(sections.otherInformation);
       }
       if (sections.vocational.length > 0 && vocationalFormData.length === 0) {
         setVocationalFormData(sections.vocational);
       }
-      if (sections.workExperiences.length > 0 && workExperiencesFormData.length === 0) {
+      if (
+        sections.workExperiences.length > 0 &&
+        workExperiencesFormData.length === 0
+      ) {
         setWorkExperiencesFormData(sections.workExperiences);
       }
     }
@@ -1030,6 +1309,79 @@ const Profile = () => {
   const otherInformation = sections.otherInformation;
   const vocational = sections.vocational;
   const workExperiences = sections.workExperiences;
+
+  const navigationSections = [
+    {
+      key: 0,
+      label: 'Personal Info',
+      icon: <PersonIcon />,
+      title: 'Personal Information',
+      subtitle: 'Manage your basic personal details and identifiers.',
+    },
+    {
+      key: 1,
+      label: 'Gov. IDs',
+      icon: <BadgeIcon />,
+      title: 'Government IDs',
+      subtitle: 'Official government identification numbers.',
+    },
+    {
+      key: 2,
+      label: 'Contact & Address',
+      icon: <CallIcon />,
+      title: 'Contact & Address',
+      subtitle: 'Contact details and permanent residence information.',
+    },
+    {
+      key: 3,
+      label: 'Family',
+      icon: <GroupIcon />,
+      title: 'Family Background',
+      subtitle: 'Spouse and parents information.',
+    },
+    {
+      key: 4,
+      label: 'Education',
+      icon: <SchoolIcon />,
+      title: 'Education History',
+      subtitle: 'Academic records and degrees earned.',
+    },
+    {
+      key: 5,
+      label: 'Children',
+      icon: <ChildCareIcon />,
+      title: 'Children',
+      subtitle: 'Children information.',
+    },
+    {
+      key: 6,
+      label: 'Work Experience',
+      icon: <WorkIcon />,
+      title: 'Work Experience',
+      subtitle: 'Professional history and appointments.',
+    },
+    {
+      key: 7,
+      label: 'Eligibility',
+      icon: <FactCheckIcon />,
+      title: 'Eligibility',
+      subtitle: 'Civil service examination results and ratings.',
+    },
+    {
+      key: 8,
+      label: 'Learning & Dev',
+      icon: <BookIcon />,
+      title: 'Learning & Development',
+      subtitle: 'Training and development programs.',
+    },
+    {
+      key: 9,
+      label: 'Other Info',
+      icon: <InfoIcon />,
+      title: 'Other Information',
+      subtitle: 'Additional skills and associations.',
+    },
+  ];
 
   const handleEditOpen = () => {
     setEditOpen(true);
@@ -1109,7 +1461,6 @@ const Profile = () => {
       setUploadStatus({ message: 'Uploading...', type: 'info' });
       setNotificationOpen(true);
 
-      // Get auth headers without Content-Type (browser will set it with boundary for multipart/form-data)
       const authHeaders = getAuthHeaders({ includeContentType: false });
       const res = await axios.post(
         `${API_BASE_URL}/upload-profile-picture/${employeeNumber}`,
@@ -1124,7 +1475,6 @@ const Profile = () => {
       );
 
       const newPicturePath = res.data.filePath;
-      // Refresh person data to get updated profile picture
       refreshPerson();
 
       setUploadStatus({
@@ -1150,7 +1500,6 @@ const Profile = () => {
         `${API_BASE_URL}/personalinfo/remove-profile-picture/${person.id}`,
         getAuthHeaders()
       );
-      // Refresh person data to get updated profile picture
       refreshPerson();
       setUploadStatus({
         message: 'Profile picture removed successfully!',
@@ -1165,9 +1514,35 @@ const Profile = () => {
   };
 
   const handleTabChange = (event, newValue) => {
-    setTabValue(newValue);
+    setCurrentSectionIndex(newValue);
   };
 
+  const handleSectionChange = (index) => {
+    setCurrentSectionIndex(index);
+  };
+
+  const handleNextSection = () => {
+    if (currentSectionIndex < navigationSections.length - 1) {
+      setCurrentSectionIndex(currentSectionIndex + 1);
+    }
+  };
+
+  const handlePrevSection = () => {
+    if (currentSectionIndex > 0) {
+      setCurrentSectionIndex(currentSectionIndex - 1);
+    }
+  };
+
+  const handleCardMouseMove = (cardId, e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setCardMousePos({ [cardId]: { x, y } });
+  };
+
+  const handleCardMouseLeave = (cardId) => {
+    setCardMousePos({ [cardId]: null });
+  };
 
   const handleImageZoom = () => {
     setImageZoomOpen(true);
@@ -1473,21 +1848,8 @@ const Profile = () => {
     return `${numRating}%`;
   };
 
-  const tabs = [
-    { key: 0, label: 'Personal', icon: <PersonIcon /> },
-    { key: 1, label: 'Gov. IDs', icon: <BadgeIcon /> },
-    { key: 2, label: 'Addresses', icon: <HomeIcon /> },
-    { key: 3, label: 'Contact', icon: <CallIcon /> },
-    { key: 4, label: 'Family', icon: <GroupIcon /> },
-    { key: 5, label: 'Education', icon: <SchoolIcon /> },
-    { key: 6, label: 'Children', icon: <ChildCareIcon /> },
-    { key: 7, label: 'Eligibility', icon: <FactCheckIcon /> },
-    { key: 8, label: 'Learning & Development', icon: <BookIcon /> },
-    { key: 9, label: 'Other Information', icon: <InfoIcon /> },
-    { key: 10, label: 'Work Experience', icon: <WorkIcon /> },
-  ];
+  const tabs = navigationSections;
 
-  // Form fields for each tab
   const formFields = {
     0: [
       {
@@ -1636,24 +1998,25 @@ const Profile = () => {
         icon: <WorkIcon fontSize="small" />,
       },
     ],
-    5: [], // Education tab will have sub-tabs
-    6: [], // Children tab doesn't have form fields
-    7: [], // Eligibility tab doesn't have form fields
-    8: [], // Learning and Development tab doesn't have form fields
-    9: [], // Other Information tab doesn't have form fields
-    10: [], // Work Experience tab doesn't have form fields
+    5: [],
+    6: [],
+    7: [],
+    8: [],
+    9: [],
+    10: [],
   };
 
   const isLoading = loading || sectionsLoading;
 
   if (isLoading) {
     return (
-      <ProfileContainer ref={profileRef}>
+      <ProfileWrapper ref={profileRef}>
         <Box
           display="flex"
           justifyContent="center"
           alignItems="center"
-          height="70vh"
+          height="100vh"
+          width="100%"
         >
           <Box textAlign="center">
             <CircularProgress
@@ -1673,789 +2036,496 @@ const Profile = () => {
             </Typography>
           </Box>
         </Box>
-      </ProfileContainer>
+      </ProfileWrapper>
     );
   }
 
   const renderTabContentGrid = (tabIndex) => {
     return renderTabContentList(tabIndex);
-    /*
-    // Special handling for Education tab with sub-tabs
-    if (tabIndex === 5) {
-      return (
-        <Box>
-          <EducationSubTabs
-            value={educationSubTabValue}
-            onChange={(e, newValue) => setEducationSubTabValue(newValue)}
-            variant="fullWidth"
-          >
-            <EducationSubTab
-              label="Elementary & Secondary"
-              icon={<SchoolIcon />}
-            />
-            <EducationSubTab label="College" icon={<SchoolRoundedIcon />} />
-            <EducationSubTab
-              label="Graduate Studies"
-              icon={<PsychologyIcon />}
-            />
-            <EducationSubTab label="Vocational" icon={<ConstructionIcon />} />
-          </EducationSubTabs>
-
-          {educationSubTabValue === 0 && (
-            <TabPanel>
-              <Grid container spacing={3}>
-                <Grid item xs={12} sm={6} md={4}>
-                  <Card
-                    sx={{
-                      height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      transition: 'all 0.3s ease',
-                      '&:hover': {
-                        transform: 'translateY(-5px)',
-                        boxShadow: shadows.medium,
-                      },
-                    }}
-                  >
-                    <CardContent sx={{ flex: 1 }}>
-                      <Box display="flex" alignItems="center" mb={1}>
-                        <SchoolIcon fontSize="small" />
-                        <Typography
-                          variant="subtitle2"
-                          color={colors.textSecondary}
-                          ml={1}
-                        >
-                          Elementary School
-                        </Typography>
-                      </Box>
-                      <Typography variant="body1" fontWeight={500}>
-                        {person?.elementaryNameOfSchool || '—'}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={12} sm={6} md={4}>
-                  <Card
-                    sx={{
-                      height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      transition: 'all 0.3s ease',
-                      '&:hover': {
-                        transform: 'translateY(-5px)',
-                        boxShadow: shadows.medium,
-                      },
-                    }}
-                  >
-                    <CardContent sx={{ flex: 1 }}>
-                      <Box display="flex" alignItems="center" mb={1}>
-                        <SchoolIcon fontSize="small" />
-                        <Typography
-                          variant="subtitle2"
-                          color={colors.textSecondary}
-                          ml={1}
-                        >
-                          Elementary Degree
-                        </Typography>
-                      </Box>
-                      <Typography variant="body1" fontWeight={500}>
-                        {person?.elementaryDegree || '—'}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={12} sm={6} md={4}>
-                  <Card
-                    sx={{
-                      height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      transition: 'all 0.3s ease',
-                      '&:hover': {
-                        transform: 'translateY(-5px)',
-                        boxShadow: shadows.medium,
-                      },
-                    }}
-                  >
-                    <CardContent sx={{ flex: 1 }}>
-                      <Box display="flex" alignItems="center" mb={1}>
-                        <SchoolIcon fontSize="small" />
-                        <Typography
-                          variant="subtitle2"
-                          color={colors.textSecondary}
-                          ml={1}
-                        >
-                          Secondary School
-                        </Typography>
-                      </Box>
-                      <Typography variant="body1" fontWeight={500}>
-                        {person?.secondaryNameOfSchool || '—'}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-                <Grid item xs={12} sm={6} md={4}>
-                  <Card
-                    sx={{
-                      height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      transition: 'all 0.3s ease',
-                      '&:hover': {
-                        transform: 'translateY(-5px)',
-                        boxShadow: shadows.medium,
-                      },
-                    }}
-                  >
-                    <CardContent sx={{ flex: 1 }}>
-                      <Box display="flex" alignItems="center" mb={1}>
-                        <SchoolIcon fontSize="small" />
-                        <Typography
-                          variant="subtitle2"
-                          color={colors.textSecondary}
-                          ml={1}
-                        >
-                          Secondary Degree
-                        </Typography>
-                      </Box>
-                      <Typography variant="body1" fontWeight={500}>
-                        {person?.secondaryDegree || '—'}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              </Grid>
-            </TabPanel>
-          )}
-
-          {educationSubTabValue === 1 && (
-            <TabPanel>
-              {colleges.length > 0 ? (
-                <Grid container spacing={3}>
-                  {colleges.map((college) => (
-                    <Grid item xs={12} sm={6} md={4} key={college.id}>
-                      <CollegeCard>
-                        <CardContent sx={{ flex: 1 }}>
-                          <Typography
-                            variant="h6"
-                            fontWeight="bold"
-                            color={colors.textPrimary}
-                            mb={1}
-                          >
-                            {college.collegeNameOfSchool}
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            color={colors.textSecondary}
-                            mb={1}
-                          >
-                            {college.collegeDegree}
-                          </Typography>
-                          {college.collegePeriodFrom &&
-                            college.collegePeriodTo && (
-                              <Box display="flex" alignItems="center">
-                                <CalendarTodayIcon
-                                  sx={{
-                                    fontSize: 16,
-                                    color: colors.textSecondary,
-                                    mr: 1,
-                                  }}
-                                />
-                                <Typography
-                                  variant="body2"
-                                  color={colors.textSecondary}
-                                >
-                                  {college.collegePeriodFrom} -{' '}
-                                  {college.collegePeriodTo}
-                                </Typography>
-                              </Box>
-                            )}
-                        </CardContent>
-                      </CollegeCard>
-                    </Grid>
-                  ))}
-                </Grid>
-              ) : (
-                <Box textAlign="center" py={4}>
-                  <Typography variant="h6" color={colors.textSecondary}>
-                    No college records found
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    color={colors.textSecondary}
-                    mt={1}
-                  >
-                    Click "Edit Profile" to add college records
-                  </Typography>
-                </Box>
-              )}
-            </TabPanel>
-          )}
-
-          {educationSubTabValue === 2 && (
-            <TabPanel>
-              {graduates.length > 0 ? (
-                <Grid container spacing={3}>
-                  {graduates.map((graduate) => (
-                    <Grid item xs={12} sm={6} md={4} key={graduate.id}>
-                      <GraduateCard>
-                        <CardContent sx={{ flex: 1 }}>
-                          <Typography
-                            variant="h6"
-                            fontWeight="bold"
-                            color={colors.textPrimary}
-                            mb={1}
-                          >
-                            {graduate.graduateNameOfSchool}
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            color={colors.textSecondary}
-                            mb={1}
-                          >
-                            {graduate.graduateDegree}
-                          </Typography>
-                          {graduate.graduatePeriodFrom &&
-                            graduate.graduatePeriodTo && (
-                              <Box display="flex" alignItems="center">
-                                <CalendarTodayIcon
-                                  sx={{
-                                    fontSize: 16,
-                                    color: colors.textSecondary,
-                                    mr: 1,
-                                  }}
-                                />
-                                <Typography
-                                  variant="body2"
-                                  color={colors.textSecondary}
-                                >
-                                  {graduate.graduatePeriodFrom} -{' '}
-                                  {graduate.graduatePeriodTo}
-                                </Typography>
-                              </Box>
-                            )}
-                        </CardContent>
-                      </GraduateCard>
-                    </Grid>
-                  ))}
-                </Grid>
-              ) : (
-                <Box textAlign="center" py={4}>
-                  <Typography variant="h6" color={colors.textSecondary}>
-                    No graduate studies records found
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    color={colors.textSecondary}
-                    mt={1}
-                  >
-                    Click "Edit Profile" to add graduate studies records
-                  </Typography>
-                </Box>
-              )}
-            </TabPanel>
-          )}
-
-          {educationSubTabValue === 3 && (
-            <TabPanel>
-              {vocational.length > 0 ? (
-                <Grid container spacing={3}>
-                  {vocational.map((voc) => (
-                    <Grid item xs={12} sm={6} md={4} key={voc.id}>
-                      <VocationalCard>
-                        <CardContent sx={{ flex: 1 }}>
-                          <Typography
-                            variant="h6"
-                            fontWeight="bold"
-                            color={colors.textPrimary}
-                            mb={1}
-                          >
-                            {voc.vocationalNameOfSchool}
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            color={colors.textSecondary}
-                            mb={1}
-                          >
-                            {voc.vocationalDegree}
-                          </Typography>
-                          {voc.vocationalPeriodFrom &&
-                            voc.vocationalPeriodTo && (
-                              <Box display="flex" alignItems="center">
-                                <CalendarTodayIcon
-                                  sx={{
-                                    fontSize: 16,
-                                    color: colors.textSecondary,
-                                    mr: 1,
-                                  }}
-                                />
-                                <Typography
-                                  variant="body2"
-                                  color={colors.textSecondary}
-                                >
-                                  {voc.vocationalPeriodFrom} -{' '}
-                                  {voc.vocationalPeriodTo}
-                                </Typography>
-                              </Box>
-                            )}
-                        </CardContent>
-                      </VocationalCard>
-                    </Grid>
-                  ))}
-                </Grid>
-              ) : (
-                <Box textAlign="center" py={4}>
-                  <Typography variant="h6" color={colors.textSecondary}>
-                    No vocational records found
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    color={colors.textSecondary}
-                    mt={1}
-                  >
-                    Click "Edit Profile" to add vocational records
-                  </Typography>
-                </Box>
-              )}
-            </TabPanel>
-          )}
-        </Box>
-      );
-    }
-
-    // Special handling for Children tab
-    if (tabIndex === 6) {
-      return (
-        <Box>
-          <ScrollableContainer>
-            {children.length > 0 ? (
-              <List>
-                {children.map((child) => (
-                  <React.Fragment key={child.id}>
-                    <ChildListItem>
-                      <MuiListItemIcon>
-                        <Box
-                          sx={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: 1.5,
-                            backgroundColor: colors.primary,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            mr: 2,
-                          }}
-                        >
-                          <ChildCareIcon sx={{ color: colors.textLight, fontSize: 20 }} />
-                        </Box>
-                      </MuiListItemIcon>
-                      <MuiListItemText
-                        primary={
-                          <Typography variant="h6" sx={{ fontWeight: 600, color: colors.textPrimary, mb: 0.5 }}>
-                            {`${child.childrenFirstName} ${child.childrenMiddleName} ${child.childrenLastName}${
-                              child.childrenNameExtension ? ` ${child.childrenNameExtension}` : ''
-                            }`}
-                          </Typography>
-                        }
-                        secondary={
-                          child.dateOfBirth ? (
-                            <Typography component="span" sx={{ display: 'block', color: colors.textPrimary }}>
-                              Born: {new Date(child.dateOfBirth).toLocaleDateString()} (Age: {getAge(child.dateOfBirth)})
-                            </Typography>
-                          ) : (
-                            'No birth date recorded'
-                          )
-                        }
-                      />
-                    </ChildListItem>
-                  </React.Fragment>
-                ))}
-              </List>
-            ) : (
-              <Box textAlign="center" py={4}>
-                <Typography variant="h6" color={colors.textSecondary}>
-                  No children records found
-                </Typography>
-                <Typography variant="body2" color={colors.textSecondary} mt={1}>
-                  Click "Edit Profile" to add children records
-                </Typography>
-              </Box>
-            )}
-          </ScrollableContainer>
-        </Box>
-      );
-    }
-
-    // Special handling for Eligibility tab
-    if (tabIndex === 7) {
-      return (
-        <Box>
-          <ScrollableContainer>
-            {eligibilities.length > 0 ? (
-              <List>
-                {eligibilities.map((eligibility) => (
-                  <React.Fragment key={eligibility.id}>
-                    <EligibilityListItem>
-                      <MuiListItemIcon>
-                        <Box
-                          sx={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: 1.5,
-                            backgroundColor: colors.primary,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            mr: 2,
-                          }}
-                        >
-                          <FactCheckIcon sx={{ color: colors.textLight, fontSize: 20 }} />
-                        </Box>
-                      </MuiListItemIcon>
-                      <MuiListItemText
-                        primary={
-                          <Typography variant="h6" sx={{ fontWeight: 600, color: colors.textPrimary, mb: 0.5 }}>
-                            {eligibility.eligibilityName}
-                          </Typography>
-                        }
-                        secondary={
-                          <>
-                            <Typography component="span" sx={{ display: 'block', color: colors.textPrimary, mb: 0.5 }}>
-                              Rating: {formatRating(eligibility.eligibilityRating)}
-                              {eligibility.licenseNumber && ` License: ${eligibility.licenseNumber}`}
-                            </Typography>
-                            {eligibility.DateOfValidity && (
-                              <Typography component="span" sx={{ display: 'block', color: colors.textPrimary }}>
-                                Valid Until: {new Date(eligibility.DateOfValidity).toLocaleDateString()}
-                              </Typography>
-                            )}
-                          </>
-                        }
-                      />
-                    </EligibilityListItem>
-                  </React.Fragment>
-                ))}
-              </List>
-            ) : (
-              <Box textAlign="center" py={4}>
-                <Typography variant="h6" color={colors.textSecondary}>
-                  No eligibility records found
-                </Typography>
-                <Typography variant="body2" color={colors.textSecondary} mt={1}>
-                  Click "Edit Profile" to add eligibility records
-                </Typography>
-              </Box>
-            )}
-          </ScrollableContainer>
-        </Box>
-      );
-    }
-
-    // Special handling for Learning and Development tab
-    if (tabIndex === 8) {
-      return (
-        <Box>
-          <ScrollableContainer>
-            {learningDevelopment.length > 0 ? (
-              <List>
-                {learningDevelopment.map((learning) => (
-                  <React.Fragment key={learning.id}>
-                    <LearningDevelopmentListItem>
-                      <MuiListItemIcon>
-                        <Box
-                          sx={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: 1.5,
-                            backgroundColor: colors.primary,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            mr: 2,
-                          }}
-                        >
-                          <LightbulbIcon sx={{ color: colors.textLight, fontSize: 20 }} />
-                        </Box>
-                      </MuiListItemIcon>
-                      <MuiListItemText
-                        primary={
-                          <Typography variant="h6" sx={{ fontWeight: 600, color: colors.textPrimary, mb: 0.5 }}>
-                            {learning.titleOfProgram}
-                          </Typography>
-                        }
-                        secondary={
-                          <>
-                            <Typography component="span" sx={{ display: 'block', color: colors.textPrimary, mb: 0.5 }}>
-                              Type: {learning.typeOfLearningDevelopment || 'N/A'}
-                              {learning.numberOfHours && ` Hours: ${learning.numberOfHours}`}
-                            </Typography>
-                            {learning.dateFrom && learning.dateTo && (
-                              <Typography component="span" sx={{ display: 'block', color: colors.textPrimary, mb: 0.5 }}>
-                                Period: {learning.dateFrom} - {learning.dateTo}
-                              </Typography>
-                            )}
-                            {learning.conductedSponsored && (
-                              <Typography component="span" sx={{ display: 'block', color: colors.textPrimary }}>
-                                Conducted/Sponsored by: {learning.conductedSponsored}
-                              </Typography>
-                            )}
-                          </>
-                        }
-                      />
-                    </LearningDevelopmentListItem>
-                  </React.Fragment>
-                ))}
-              </List>
-            ) : (
-              <Box textAlign="center" py={4}>
-                <Typography variant="h6" color={colors.textSecondary}>
-                  No learning and development records found
-                </Typography>
-                <Typography variant="body2" color={colors.textSecondary} mt={1}>
-                  Click "Edit Profile" to add learning and development records
-                </Typography>
-              </Box>
-            )}
-          </ScrollableContainer>
-        </Box>
-      );
-    }
-
-    // Special handling for Other Information tab
-    if (tabIndex === 9) {
-      return (
-        <Box>
-          <ScrollableContainer>
-            {otherInformation.length > 0 ? (
-              <List>
-                {otherInformation.map((info) => (
-                  <React.Fragment key={info.id}>
-                    <OtherInformationListItem>
-                      <MuiListItemIcon>
-                        <Box
-                          sx={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: 1.5,
-                            backgroundColor: colors.primary,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            mr: 2,
-                          }}
-                        >
-                          <InfoIcon sx={{ color: colors.textLight, fontSize: 20 }} />
-                        </Box>
-                      </MuiListItemIcon>
-                      <MuiListItemText
-                        primary={
-                          <Typography variant="h6" sx={{ fontWeight: 600, color: colors.textPrimary, mb: 0.5 }}>
-                            Other Information
-                          </Typography>
-                        }
-                        secondary={
-                          <>
-                            {info.specialSkills && (
-                              <Typography component="span" sx={{ display: 'block', color: colors.textPrimary, mb: 0.5 }}>
-                                Skills: {info.specialSkills}
-                              </Typography>
-                            )}
-                            {info.nonAcademicDistinctions && (
-                              <Typography component="span" sx={{ display: 'block', color: colors.textPrimary, mb: 0.5 }}>
-                                Distinctions: {info.nonAcademicDistinctions}
-                              </Typography>
-                            )}
-                            {info.membershipInAssociation && (
-                              <Typography component="span" sx={{ display: 'block', color: colors.textPrimary }}>
-                                Associations: {info.membershipInAssociation}
-                              </Typography>
-                            )}
-                          </>
-                        }
-                      />
-                    </OtherInformationListItem>
-                  </React.Fragment>
-                ))}
-              </List>
-            ) : (
-              <Box textAlign="center" py={4}>
-                <Typography variant="h6" color={colors.textSecondary}>
-                  No other information records found
-                </Typography>
-                <Typography variant="body2" color={colors.textSecondary} mt={1}>
-                  Click "Edit Profile" to add other information records
-                </Typography>
-              </Box>
-            )}
-          </ScrollableContainer>
-        </Box>
-      );
-    }
-
-    if (tabIndex === 10) {
-      return (
-        <Box>
-          <ScrollableContainer>
-            {workExperiences.length > 0 ? (
-              <List>
-                {workExperiences.map((workExp) => (
-                  <React.Fragment key={workExp.id}>
-                    <WorkExperienceListItem>
-                      <MuiListItemIcon>
-                        <Box
-                          sx={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: 1.5,
-                            backgroundColor: colors.primary,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            mr: 2,
-                          }}
-                        >
-                          <WorkIcon sx={{ color: colors.textLight, fontSize: 20 }} />
-                        </Box>
-                      </MuiListItemIcon>
-                      <MuiListItemText
-                        primary={
-                          <Typography variant="h6" sx={{ fontWeight: 600, color: colors.textPrimary, mb: 0.5 }}>
-                            {workExp.workPositionTitle}
-                          </Typography>
-                        }
-                        secondary={
-                          <>
-                            <Typography component="span" sx={{ display: 'block', color: colors.textPrimary, mb: 0.5 }}>
-                              {workExp.workCompany}
-                              {workExp.workMonthlySalary && ` | Salary: ₱${parseFloat(workExp.workMonthlySalary).toLocaleString()}`}
-                              {workExp.isGovtService && ` | ${workExp.isGovtService === 'Yes' ? 'Government' : 'Private'}`}
-                            </Typography>
-                            {workExp.workDateFrom && workExp.workDateTo && (
-                              <Typography component="span" sx={{ display: 'block', color: colors.textPrimary }}>
-                                {new Date(workExp.workDateFrom).toLocaleDateString()} - {new Date(workExp.workDateTo).toLocaleDateString()}
-                              </Typography>
-                            )}
-                          </>
-                        }
-                      />
-                    </WorkExperienceListItem>
-                  </React.Fragment>
-                ))}
-              </List>
-            ) : (
-              <Box textAlign="center" py={4}>
-                <Typography variant="h6" color={colors.textSecondary}>
-                  No work experience records found
-                </Typography>
-                <Typography variant="body2" color={colors.textSecondary} mt={1}>
-                  Click "Edit Profile" to add work experience records
-                </Typography>
-              </Box>
-            )}
-          </ScrollableContainer>
-        </Box>
-      );
-    }
-
-    // Default case for other tabs
-    const fields = formFields[tabIndex] || [];
-
-    return (
-      <Box>
-        <ScrollableContainer>
-          {fields.length > 0 ? (
-            <List>
-              {fields.map((field, idx) => (
-                <React.Fragment key={idx}>
-                  <EligibilityListItem>
-                    <MuiListItemIcon>
-                      <Box
-                        sx={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: 1.5,
-                          backgroundColor: colors.primary,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          mr: 2,
-                        }}
-                      >
-                        {field.icon && React.cloneElement(field.icon, { sx: { color: colors.textLight, fontSize: 20 } })}
-                      </Box>
-                    </MuiListItemIcon>
-                    <MuiListItemText
-                      primary={
-                        <Typography variant="h6" sx={{ fontWeight: 600, color: colors.textPrimary, mb: 0.5 }}>
-                          {field.label}
-                        </Typography>
-                      }
-                      secondary={
-                        <Typography component="span" sx={{ display: 'block', color: colors.textPrimary }}>
-                          {person?.[field.name] || '—'}
-                        </Typography>
-                      }
-                    />
-                  </EligibilityListItem>
-                </React.Fragment>
-              ))}
-            </List>
-          ) : (
-            <Box textAlign="center" py={4}>
-              <Typography variant="h6" color={colors.textSecondary}>
-                No information available
-              </Typography>
-            </Box>
-          )}
-        </ScrollableContainer>
-      </Box>
-    );
-    */
   };
 
-  const renderRecordGroup = (items, emptyMessage, formatter) => {
-    if (!items || items.length === 0) {
-      return (
-        <Box py={2} textAlign="center">
-          <Typography variant="body2" color={colors.textSecondary}>
-            {emptyMessage}
-          </Typography>
-        </Box>
-      );
-    }
+  const renderContentSection = (sectionIndex) => {
+    const section = navigationSections[sectionIndex];
+    if (!section) return null;
 
-    return items.map((item, index) => {
-      const { label, lines } = formatter(item, index);
-      const contentLines = (lines || []).filter(Boolean);
-
-      return (
-        <InfoItem key={item.id || index}>
-          <InfoLabel variant="body2">{label}</InfoLabel>
-          <InfoValue variant="body1">
-            {contentLines.length > 0 ? (
-              contentLines.map((line, lineIdx) => (
-                <Typography
-                  key={lineIdx}
-                  variant="body2"
-                  color={colors.textPrimary}
-                  sx={{ display: 'block' }}
-                >
-                  {line}
-                </Typography>
-              ))
-            ) : (
-              <Typography variant="body2" color={colors.textSecondary}>
-                —
+    switch (sectionIndex) {
+      case 0: // Personal Info
+        return (
+          <DataCard
+            onMouseMove={(e) => handleCardMouseMove('personal', e)}
+            onMouseLeave={() => handleCardMouseLeave('personal')}
+            mouseX={cardMousePos.personal?.x}
+            mouseY={cardMousePos.personal?.y}
+          >
+            <CardInner>
+              <InfoGrid>
+                <InfoGroup>
+                  <InfoLabel>First Name</InfoLabel>
+                  <InfoValue>{person?.firstName || '—'}</InfoValue>
+                </InfoGroup>
+                <InfoGroup>
+                  <InfoLabel>Middle Name</InfoLabel>
+                  <InfoValue>{person?.middleName || '—'}</InfoValue>
+                </InfoGroup>
+                <InfoGroup>
+                  <InfoLabel>Last Name</InfoLabel>
+                  <InfoValue>{person?.lastName || '—'}</InfoValue>
+                </InfoGroup>
+                <InfoGroup>
+                  <InfoLabel>Name Extension</InfoLabel>
+                  <InfoValue>{person?.nameExtension || '—'}</InfoValue>
+                </InfoGroup>
+                <InfoGroup>
+                  <InfoLabel>Date of Birth</InfoLabel>
+                  <InfoValue>
+                    {person?.birthDate ? formatDate(person.birthDate) : '—'}
+                  </InfoValue>
+                </InfoGroup>
+                <InfoGroup>
+                  <InfoLabel>Place of Birth</InfoLabel>
+                  <InfoValue>{person?.placeOfBirth || '—'}</InfoValue>
+                </InfoGroup>
+              </InfoGrid>
+            </CardInner>
+          </DataCard>
+        );
+      case 1: // Gov. IDs
+        return (
+          <DataCard
+            onMouseMove={(e) => handleCardMouseMove('govids', e)}
+            onMouseLeave={() => handleCardMouseLeave('govids')}
+            mouseX={cardMousePos.govids?.x}
+            mouseY={cardMousePos.govids?.y}
+          >
+            <CardInner>
+              <InfoGrid>
+                <InfoGroup>
+                  <InfoLabel>GSIS No.</InfoLabel>
+                  <InfoValue>{person?.gsisNum || '—'}</InfoValue>
+                </InfoGroup>
+                <InfoGroup>
+                  <InfoLabel>Pag-IBIG No.</InfoLabel>
+                  <InfoValue>{person?.pagibigNum || '—'}</InfoValue>
+                </InfoGroup>
+                <InfoGroup>
+                  <InfoLabel>PhilHealth No.</InfoLabel>
+                  <InfoValue>{person?.philhealthNum || '—'}</InfoValue>
+                </InfoGroup>
+                <InfoGroup>
+                  <InfoLabel>SSS No.</InfoLabel>
+                  <InfoValue>{person?.sssNum || '—'}</InfoValue>
+                </InfoGroup>
+                <InfoGroup>
+                  <InfoLabel>TIN No.</InfoLabel>
+                  <InfoValue>{person?.tinNum || '—'}</InfoValue>
+                </InfoGroup>
+                <InfoGroup>
+                  <InfoLabel>Agency Employee No.</InfoLabel>
+                  <InfoValue>{person?.agencyEmployeeNum || '—'}</InfoValue>
+                </InfoGroup>
+              </InfoGrid>
+            </CardInner>
+          </DataCard>
+        );
+      case 2: // Contact & Address
+        return (
+          <DataCard
+            onMouseMove={(e) => handleCardMouseMove('contact', e)}
+            onMouseLeave={() => handleCardMouseLeave('contact')}
+            mouseX={cardMousePos.contact?.x}
+            mouseY={cardMousePos.contact?.y}
+          >
+            <CardInner>
+              <InfoGrid>
+                <InfoGroup>
+                  <InfoLabel>Mobile Number</InfoLabel>
+                  <InfoValue>{person?.mobileNum || '—'}</InfoValue>
+                </InfoGroup>
+                <InfoGroup>
+                  <InfoLabel>Telephone</InfoLabel>
+                  <InfoValue>{person?.telephone || '—'}</InfoValue>
+                </InfoGroup>
+                <InfoGroup>
+                  <InfoLabel>Email Address</InfoLabel>
+                  <InfoValue>{person?.emailAddress || '—'}</InfoValue>
+                </InfoGroup>
+                <InfoGroup>
+                  <InfoLabel>House/Block/Lot</InfoLabel>
+                  <InfoValue>
+                    {person?.permanent_houseBlockLotNum || '—'}
+                  </InfoValue>
+                </InfoGroup>
+                <InfoGroup>
+                  <InfoLabel>Street</InfoLabel>
+                  <InfoValue>{person?.permanent_streetName || '—'}</InfoValue>
+                </InfoGroup>
+                <InfoGroup>
+                  <InfoLabel>Subdivision</InfoLabel>
+                  <InfoValue>
+                    {person?.permanent_subdivisionOrVillage || '—'}
+                  </InfoValue>
+                </InfoGroup>
+                <InfoGroup>
+                  <InfoLabel>Barangay</InfoLabel>
+                  <InfoValue>{person?.permanent_barangay || '—'}</InfoValue>
+                </InfoGroup>
+                <InfoGroup>
+                  <InfoLabel>City/Municipality</InfoLabel>
+                  <InfoValue>
+                    {person?.permanent_cityOrMunicipality || '—'}
+                  </InfoValue>
+                </InfoGroup>
+                <InfoGroup>
+                  <InfoLabel>Province</InfoLabel>
+                  <InfoValue>{person?.permanent_provinceName || '—'}</InfoValue>
+                </InfoGroup>
+                <InfoGroup>
+                  <InfoLabel>Zip Code</InfoLabel>
+                  <InfoValue>{person?.permanent_zipcode || '—'}</InfoValue>
+                </InfoGroup>
+              </InfoGrid>
+            </CardInner>
+          </DataCard>
+        );
+      case 3: // Family
+        return (
+          <DataCard
+            onMouseMove={(e) => handleCardMouseMove('family', e)}
+            onMouseLeave={() => handleCardMouseLeave('family')}
+            mouseX={cardMousePos.family?.x}
+            mouseY={cardMousePos.family?.y}
+          >
+            <CardInner>
+              <Typography
+                variant="h6"
+                sx={{
+                  marginBottom: '15px',
+                  color: colors.primary,
+                  fontSize: '1.1rem',
+                }}
+              >
+                Spouse
               </Typography>
-            )}
-          </InfoValue>
-        </InfoItem>
-      );
-    });
+              <InfoGrid sx={{ marginBottom: '25px' }}>
+                <InfoGroup>
+                  <InfoLabel>Name</InfoLabel>
+                  <InfoValue>
+                    {person?.spouseFirstName ||
+                    person?.spouseMiddleName ||
+                    person?.spouseLastName
+                      ? `${person.spouseFirstName || ''} ${
+                          person.spouseMiddleName || ''
+                        } ${person.spouseLastName || ''}`.trim()
+                      : '—'}
+                  </InfoValue>
+                </InfoGroup>
+                <InfoGroup>
+                  <InfoLabel>Occupation</InfoLabel>
+                  <InfoValue>{person?.spouseOccupation || '—'}</InfoValue>
+                </InfoGroup>
+              </InfoGrid>
+            </CardInner>
+          </DataCard>
+        );
+      case 4: // Education
+        return (
+          <DataCard
+            onMouseMove={(e) => handleCardMouseMove('education', e)}
+            onMouseLeave={() => handleCardMouseLeave('education')}
+            mouseX={cardMousePos.education?.x}
+            mouseY={cardMousePos.education?.y}
+          >
+            <CardInner>
+              <Timeline>
+                {colleges.length > 0 &&
+                  colleges.map((college, idx) => (
+                    <TimelineItem key={college.id || idx}>
+                      <TimelineDate>
+                        {college.collegePeriodFrom || 'N/A'} -{' '}
+                        {college.collegePeriodTo || 'Present'}
+                      </TimelineDate>
+                      <TimelineTitle>
+                        {college.collegeDegree || '—'}
+                      </TimelineTitle>
+                      <TimelineOrg>
+                        {college.collegeNameOfSchool || '—'}
+                      </TimelineOrg>
+                    </TimelineItem>
+                  ))}
+                {person?.secondaryNameOfSchool && (
+                  <TimelineItem>
+                    <TimelineDate>Secondary</TimelineDate>
+                    <TimelineTitle>
+                      {person.secondaryDegree || 'High School'}
+                    </TimelineTitle>
+                    <TimelineOrg>{person.secondaryNameOfSchool}</TimelineOrg>
+                  </TimelineItem>
+                )}
+                {person?.elementaryNameOfSchool && (
+                  <TimelineItem sx={{ paddingBottom: 0 }}>
+                    <TimelineDate>Elementary</TimelineDate>
+                    <TimelineTitle>
+                      {person.elementaryDegree || 'Elementary'}
+                    </TimelineTitle>
+                    <TimelineOrg>{person.elementaryNameOfSchool}</TimelineOrg>
+                  </TimelineItem>
+                )}
+              </Timeline>
+            </CardInner>
+          </DataCard>
+        );
+      case 5: // Children
+        return (
+          <DataCard
+            onMouseMove={(e) => handleCardMouseMove('children', e)}
+            onMouseLeave={() => handleCardMouseLeave('children')}
+            mouseX={cardMousePos.children?.x}
+            mouseY={cardMousePos.children?.y}
+          >
+            <CardInner>
+              {children.length > 0 ? (
+                <InfoGrid>
+                  {children.map((child, idx) => (
+                    <InfoGroup key={child.id || idx}>
+                      <InfoLabel>Child {idx + 1}</InfoLabel>
+                      <InfoValue>
+                        {`${child.childrenFirstName || ''} ${
+                          child.childrenMiddleName || ''
+                        } ${child.childrenLastName || ''} ${
+                          child.childrenNameExtension || ''
+                        }`.trim() || '—'}
+                        {child.dateOfBirth &&
+                          ` (Age: ${getAge(child.dateOfBirth)})`}
+                      </InfoValue>
+                    </InfoGroup>
+                  ))}
+                </InfoGrid>
+              ) : (
+                <Typography
+                  variant="body2"
+                  color={colors.textSecondary}
+                  textAlign="center"
+                  py={2}
+                >
+                  No children records found
+                </Typography>
+              )}
+            </CardInner>
+          </DataCard>
+        );
+      case 6: // Work Experience
+        return (
+          <DataCard
+            onMouseMove={(e) => handleCardMouseMove('work', e)}
+            onMouseLeave={() => handleCardMouseLeave('work')}
+            mouseX={cardMousePos.work?.x}
+            mouseY={cardMousePos.work?.y}
+          >
+            <CardInner>
+              {workExperiences.length > 0 ? (
+                <Timeline>
+                  {workExperiences.map((workExp, idx) => (
+                    <TimelineItem
+                      key={workExp.id || idx}
+                      sx={
+                        idx === workExperiences.length - 1
+                          ? { paddingBottom: 0 }
+                          : {}
+                      }
+                    >
+                      <TimelineDate>
+                        {workExp.workDateFrom
+                          ? formatDate(workExp.workDateFrom)
+                          : 'N/A'}{' '}
+                        -{' '}
+                        {workExp.workDateTo
+                          ? formatDate(workExp.workDateTo)
+                          : 'Present'}
+                      </TimelineDate>
+                      <TimelineTitle>
+                        {workExp.workPositionTitle || '—'}
+                      </TimelineTitle>
+                      <TimelineOrg>{workExp.workCompany || '—'}</TimelineOrg>
+                    </TimelineItem>
+                  ))}
+                </Timeline>
+              ) : (
+                <Typography
+                  variant="body2"
+                  color={colors.textSecondary}
+                  textAlign="center"
+                  py={2}
+                >
+                  No work experience records found
+                </Typography>
+              )}
+            </CardInner>
+          </DataCard>
+        );
+      case 7: // Eligibility
+        return (
+          <DataCard
+            onMouseMove={(e) => handleCardMouseMove('eligibility', e)}
+            onMouseLeave={() => handleCardMouseLeave('eligibility')}
+            mouseX={cardMousePos.eligibility?.x}
+            mouseY={cardMousePos.eligibility?.y}
+          >
+            <CardInner>
+              {eligibilities.length > 0 ? (
+                <InfoGrid>
+                  {eligibilities.map((eligibility, idx) => (
+                    <React.Fragment key={eligibility.id || idx}>
+                      <InfoGroup>
+                        <InfoLabel>Eligibility</InfoLabel>
+                        <InfoValue
+                          sx={{ color: colors.primary, fontWeight: 700 }}
+                        >
+                          {eligibility.eligibilityName || '—'}
+                        </InfoValue>
+                      </InfoGroup>
+                      <InfoGroup>
+                        <InfoLabel>Rating</InfoLabel>
+                        <InfoValue>
+                          {formatRating(eligibility.eligibilityRating)}
+                        </InfoValue>
+                      </InfoGroup>
+                      <InfoGroup>
+                        <InfoLabel>Date of Exam</InfoLabel>
+                        <InfoValue>
+                          {eligibility.eligibilityDateOfExam
+                            ? formatDate(eligibility.eligibilityDateOfExam)
+                            : '—'}
+                        </InfoValue>
+                      </InfoGroup>
+                      <InfoGroup>
+                        <InfoLabel>Place of Exam</InfoLabel>
+                        <InfoValue>
+                          {eligibility.eligibilityPlaceOfExam || '—'}
+                        </InfoValue>
+                      </InfoGroup>
+                    </React.Fragment>
+                  ))}
+                </InfoGrid>
+              ) : (
+                <Typography
+                  variant="body2"
+                  color={colors.textSecondary}
+                  textAlign="center"
+                  py={2}
+                >
+                  No eligibility records found
+                </Typography>
+              )}
+            </CardInner>
+          </DataCard>
+        );
+      case 8: // Learning & Development
+        return (
+          <DataCard
+            onMouseMove={(e) => handleCardMouseMove('learning', e)}
+            onMouseLeave={() => handleCardMouseLeave('learning')}
+            mouseX={cardMousePos.learning?.x}
+            mouseY={cardMousePos.learning?.y}
+          >
+            <CardInner>
+              {learningDevelopment.length > 0 ? (
+                <Timeline>
+                  {learningDevelopment.map((learning, idx) => (
+                    <TimelineItem
+                      key={learning.id || idx}
+                      sx={
+                        idx === learningDevelopment.length - 1
+                          ? { paddingBottom: 0 }
+                          : {}
+                      }
+                    >
+                      <TimelineDate>
+                        {learning.dateFrom
+                          ? formatDate(learning.dateFrom)
+                          : 'N/A'}{' '}
+                        -{' '}
+                        {learning.dateTo
+                          ? formatDate(learning.dateTo)
+                          : 'Present'}
+                      </TimelineDate>
+                      <TimelineTitle>
+                        {learning.titleOfProgram || '—'}
+                      </TimelineTitle>
+                      <TimelineOrg>
+                        {learning.typeOfLearningDevelopment || '—'}{' '}
+                        {learning.numberOfHours &&
+                          `• ${learning.numberOfHours} hours`}
+                      </TimelineOrg>
+                    </TimelineItem>
+                  ))}
+                </Timeline>
+              ) : (
+                <Typography
+                  variant="body2"
+                  color={colors.textSecondary}
+                  textAlign="center"
+                  py={2}
+                >
+                  No learning and development records found
+                </Typography>
+              )}
+            </CardInner>
+          </DataCard>
+        );
+      case 9: // Other Information
+        return (
+          <DataCard
+            onMouseMove={(e) => handleCardMouseMove('other', e)}
+            onMouseLeave={() => handleCardMouseLeave('other')}
+            mouseX={cardMousePos.other?.x}
+            mouseY={cardMousePos.other?.y}
+          >
+            <CardInner>
+              {otherInformation.length > 0 ? (
+                <InfoGrid>
+                  {otherInformation.map((info, idx) => (
+                    <React.Fragment key={info.id || idx}>
+                      {info.specialSkills && (
+                        <InfoGroup>
+                          <InfoLabel>Special Skills</InfoLabel>
+                          <InfoValue>{info.specialSkills}</InfoValue>
+                        </InfoGroup>
+                      )}
+                      {info.nonAcademicDistinctions && (
+                        <InfoGroup>
+                          <InfoLabel>Non-Academic Distinctions</InfoLabel>
+                          <InfoValue>{info.nonAcademicDistinctions}</InfoValue>
+                        </InfoGroup>
+                      )}
+                      {info.membershipInAssociation && (
+                        <InfoGroup>
+                          <InfoLabel>Membership in Association</InfoLabel>
+                          <InfoValue>{info.membershipInAssociation}</InfoValue>
+                        </InfoGroup>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </InfoGrid>
+              ) : (
+                <Typography
+                  variant="body2"
+                  color={colors.textSecondary}
+                  textAlign="center"
+                  py={2}
+                >
+                  No other information records found
+                </Typography>
+              )}
+            </CardInner>
+          </DataCard>
+        );
+      default:
+        return null;
+    }
   };
 
   const renderTabContentList = (tabIndex) => {
-    if (tabIndex === 5) {
+    if (tabIndex === 4) {
       return (
         <Box>
           <EducationSubTabs
@@ -2539,19 +2609,36 @@ const Profile = () => {
                                 mr: 2,
                               }}
                             >
-                              <SchoolRoundedIcon sx={{ color: colors.textLight, fontSize: 20 }} />
+                              <SchoolRoundedIcon
+                                sx={{ color: colors.textLight, fontSize: 20 }}
+                              />
                             </Box>
                           </MuiListItemIcon>
                           <MuiListItemText
                             primary={
-                              <Typography variant="h6" sx={{ fontWeight: 600, color: colors.textPrimary, mb: 0.5 }}>
+                              <Typography
+                                variant="h6"
+                                sx={{
+                                  fontWeight: 600,
+                                  color: colors.textPrimary,
+                                  mb: 0.5,
+                                }}
+                              >
                                 {college.collegeNameOfSchool}
                               </Typography>
                             }
                             secondary={
                               college.collegeDegree ? (
-                                <Typography component="span" sx={{ display: 'block', color: colors.textPrimary }}>
-                                  {college.collegeDegree} ({college.collegePeriodFrom || 'N/A'} - {college.collegePeriodTo || 'N/A'})
+                                <Typography
+                                  component="span"
+                                  sx={{
+                                    display: 'block',
+                                    color: colors.textPrimary,
+                                  }}
+                                >
+                                  {college.collegeDegree} (
+                                  {college.collegePeriodFrom || 'N/A'} -{' '}
+                                  {college.collegePeriodTo || 'N/A'})
                                 </Typography>
                               ) : (
                                 'No degree information'
@@ -2601,19 +2688,36 @@ const Profile = () => {
                                 mr: 2,
                               }}
                             >
-                              <PsychologyIcon sx={{ color: colors.textLight, fontSize: 20 }} />
+                              <PsychologyIcon
+                                sx={{ color: colors.textLight, fontSize: 20 }}
+                              />
                             </Box>
                           </MuiListItemIcon>
                           <MuiListItemText
                             primary={
-                              <Typography variant="h6" sx={{ fontWeight: 600, color: colors.textPrimary, mb: 0.5 }}>
+                              <Typography
+                                variant="h6"
+                                sx={{
+                                  fontWeight: 600,
+                                  color: colors.textPrimary,
+                                  mb: 0.5,
+                                }}
+                              >
                                 {graduate.graduateNameOfSchool}
                               </Typography>
                             }
                             secondary={
                               graduate.graduateDegree ? (
-                                <Typography component="span" sx={{ display: 'block', color: colors.textPrimary }}>
-                                  {graduate.graduateDegree} ({graduate.graduatePeriodFrom || 'N/A'} - {graduate.graduatePeriodTo || 'N/A'})
+                                <Typography
+                                  component="span"
+                                  sx={{
+                                    display: 'block',
+                                    color: colors.textPrimary,
+                                  }}
+                                >
+                                  {graduate.graduateDegree} (
+                                  {graduate.graduatePeriodFrom || 'N/A'} -{' '}
+                                  {graduate.graduatePeriodTo || 'N/A'})
                                 </Typography>
                               ) : (
                                 'No degree information'
@@ -2663,19 +2767,36 @@ const Profile = () => {
                                 mr: 2,
                               }}
                             >
-                              <ConstructionIcon sx={{ color: colors.textLight, fontSize: 20 }} />
+                              <ConstructionIcon
+                                sx={{ color: colors.textLight, fontSize: 20 }}
+                              />
                             </Box>
                           </MuiListItemIcon>
                           <MuiListItemText
                             primary={
-                              <Typography variant="h6" sx={{ fontWeight: 600, color: colors.textPrimary, mb: 0.5 }}>
+                              <Typography
+                                variant="h6"
+                                sx={{
+                                  fontWeight: 600,
+                                  color: colors.textPrimary,
+                                  mb: 0.5,
+                                }}
+                              >
                                 {voc.vocationalNameOfSchool}
                               </Typography>
                             }
                             secondary={
                               voc.vocationalDegree ? (
-                                <Typography component="span" sx={{ display: 'block', color: colors.textPrimary }}>
-                                  {voc.vocationalDegree} ({voc.vocationalPeriodFrom || 'N/A'} - {voc.vocationalPeriodTo || 'N/A'})
+                                <Typography
+                                  component="span"
+                                  sx={{
+                                    display: 'block',
+                                    color: colors.textPrimary,
+                                  }}
+                                >
+                                  {voc.vocationalDegree} (
+                                  {voc.vocationalPeriodFrom || 'N/A'} -{' '}
+                                  {voc.vocationalPeriodTo || 'N/A'})
                                 </Typography>
                               ) : (
                                 'No degree information'
@@ -2707,7 +2828,7 @@ const Profile = () => {
       );
     }
 
-    if (tabIndex === 6) {
+    if (tabIndex === 5) {
       if (!children || children.length === 0) {
         return (
           <Box py={2} textAlign="center">
@@ -2737,7 +2858,11 @@ const Profile = () => {
                 primary={
                   <Typography
                     variant="subtitle1"
-                    sx={{ fontWeight: 600, color: colors.textPrimary, mb: 0.5 }}
+                    sx={{
+                      fontWeight: 600,
+                      color: colors.textPrimary,
+                      mb: 0.5,
+                    }}
                   >
                     {formatChildName(child) || `Child ${index + 1}`}
                   </Typography>
@@ -2746,12 +2871,12 @@ const Profile = () => {
                   <Box>
                     <InfoItem sx={{ mb: 0.5, p: 0 }}>
                       <InfoLabel sx={{ minWidth: 140 }}>Full Name</InfoLabel>
-                      <InfoValue>
-                        {formatChildName(child) || '—'}
-                      </InfoValue>
+                      <InfoValue>{formatChildName(child) || '—'}</InfoValue>
                     </InfoItem>
                     <InfoItem sx={{ mb: 0, p: 0 }}>
-                      <InfoLabel sx={{ minWidth: 140 }}>Date of Birth</InfoLabel>
+                      <InfoLabel sx={{ minWidth: 140 }}>
+                        Date of Birth
+                      </InfoLabel>
                       <InfoValue>
                         {child.dateOfBirth
                           ? `${formatDate(child.dateOfBirth)} (Age: ${getAge(
@@ -2788,10 +2913,13 @@ const Profile = () => {
                 primary={
                   <Typography
                     variant="subtitle1"
-                    sx={{ fontWeight: 600, color: colors.textPrimary, mb: 0.5 }}
+                    sx={{
+                      fontWeight: 600,
+                      color: colors.textPrimary,
+                      mb: 0.5,
+                    }}
                   >
-                    {eligibility.eligibilityName ||
-                      `Eligibility ${index + 1}`}
+                    {eligibility.eligibilityName || `Eligibility ${index + 1}`}
                   </Typography>
                 }
                 secondary={
@@ -2813,7 +2941,9 @@ const Profile = () => {
                       </InfoValue>
                     </InfoItem>
                     <InfoItem sx={{ mb: 0.5, p: 0 }}>
-                      <InfoLabel sx={{ minWidth: 120 }}>Place of Exam</InfoLabel>
+                      <InfoLabel sx={{ minWidth: 120 }}>
+                        Place of Exam
+                      </InfoLabel>
                       <InfoValue>
                         {eligibility.eligibilityPlaceOfExam || '—'}
                       </InfoValue>
@@ -2822,9 +2952,7 @@ const Profile = () => {
                       <InfoLabel sx={{ minWidth: 120 }}>
                         License Number
                       </InfoLabel>
-                      <InfoValue>
-                        {eligibility.licenseNumber || '—'}
-                      </InfoValue>
+                      <InfoValue>{eligibility.licenseNumber || '—'}</InfoValue>
                     </InfoItem>
                     <InfoItem sx={{ mb: 0, p: 0 }}>
                       <InfoLabel sx={{ minWidth: 120 }}>Valid Until</InfoLabel>
@@ -2862,7 +2990,11 @@ const Profile = () => {
                 primary={
                   <Typography
                     variant="subtitle1"
-                    sx={{ fontWeight: 600, color: colors.textPrimary, mb: 0.5 }}
+                    sx={{
+                      fontWeight: 600,
+                      color: colors.textPrimary,
+                      mb: 0.5,
+                    }}
                   >
                     {learning.titleOfProgram || `Program ${index + 1}`}
                   </Typography>
@@ -2876,7 +3008,9 @@ const Profile = () => {
                       </InfoValue>
                     </InfoItem>
                     <InfoItem sx={{ mb: 0.5, p: 0 }}>
-                      <InfoLabel sx={{ minWidth: 160 }}>Number of Hours</InfoLabel>
+                      <InfoLabel sx={{ minWidth: 160 }}>
+                        Number of Hours
+                      </InfoLabel>
                       <InfoValue>{learning.numberOfHours || '—'}</InfoValue>
                     </InfoItem>
                     <InfoItem sx={{ mb: 0.5, p: 0 }}>
@@ -2925,7 +3059,11 @@ const Profile = () => {
                 primary={
                   <Typography
                     variant="subtitle1"
-                    sx={{ fontWeight: 600, color: colors.textPrimary, mb: 0.5 }}
+                    sx={{
+                      fontWeight: 600,
+                      color: colors.textPrimary,
+                      mb: 0.5,
+                    }}
                   >
                     {`Entry ${index + 1}`}
                   </Typography>
@@ -2933,7 +3071,9 @@ const Profile = () => {
                 secondary={
                   <Box>
                     <InfoItem sx={{ mb: 0.5, p: 0 }}>
-                      <InfoLabel sx={{ minWidth: 180 }}>Special Skills</InfoLabel>
+                      <InfoLabel sx={{ minWidth: 180 }}>
+                        Special Skills
+                      </InfoLabel>
                       <InfoValue>{info.specialSkills || '—'}</InfoValue>
                     </InfoItem>
                     <InfoItem sx={{ mb: 0.5, p: 0 }}>
@@ -2961,7 +3101,7 @@ const Profile = () => {
       );
     }
 
-    if (tabIndex === 10) {
+    if (tabIndex === 6) {
       if (!workExperiences || workExperiences.length === 0) {
         return (
           <Box py={2} textAlign="center">
@@ -2980,7 +3120,11 @@ const Profile = () => {
                 primary={
                   <Typography
                     variant="subtitle1"
-                    sx={{ fontWeight: 600, color: colors.textPrimary, mb: 0.5 }}
+                    sx={{
+                      fontWeight: 600,
+                      color: colors.textPrimary,
+                      mb: 0.5,
+                    }}
                   >
                     {workExp.workPositionTitle ||
                       `Work Experience ${index + 1}`}
@@ -3031,9 +3175,7 @@ const Profile = () => {
                       </InfoValue>
                     </InfoItem>
                     <InfoItem sx={{ mb: 0, p: 0 }}>
-                      <InfoLabel sx={{ minWidth: 160 }}>
-                        Service Type
-                      </InfoLabel>
+                      <InfoLabel sx={{ minWidth: 160 }}>Service Type</InfoLabel>
                       <InfoValue>
                         {workExp.isGovtService
                           ? workExp.isGovtService === 'Yes'
@@ -3056,14 +3198,24 @@ const Profile = () => {
     return (
       <EligibilityCard>
         <List disablePadding>
-          <EligibilityListItem sx={{ border: 'none', boxShadow: 'none', backgroundColor: colors.secondary }}>
+          <EligibilityListItem
+            sx={{
+              border: 'none',
+              boxShadow: 'none',
+              backgroundColor: colors.secondary,
+            }}
+          >
             <MuiListItemText
               primary={
                 <Typography
                   variant="subtitle1"
-                  sx={{ fontWeight: 600, color: colors.textPrimary, mb: 1 }}
+                  sx={{
+                    fontWeight: 600,
+                    color: colors.textPrimary,
+                    mb: 1,
+                  }}
                 >
-                  {tabs[tabValue]?.label || 'Details'}
+                  {tabs[currentSectionIndex]?.label || 'Details'}
                 </Typography>
               }
               secondary={
@@ -3089,7 +3241,7 @@ const Profile = () => {
   };
 
   const renderFormFields = () => {
-    if (tabValue === 5) {
+    if (currentSectionIndex === 4) {
       return (
         <Box>
           <Typography variant="h6" gutterBottom>
@@ -3581,7 +3733,7 @@ const Profile = () => {
       );
     }
 
-    if (tabValue === 6) {
+    if (currentSectionIndex === 5) {
       return (
         <Box>
           <Typography variant="h6" gutterBottom>
@@ -3693,7 +3845,7 @@ const Profile = () => {
       );
     }
 
-    if (tabValue === 7) {
+    if (currentSectionIndex === 7) {
       return (
         <Box>
           <Typography variant="h6" gutterBottom>
@@ -3831,7 +3983,7 @@ const Profile = () => {
       );
     }
 
-    if (tabValue === 8) {
+    if (currentSectionIndex === 8) {
       return (
         <Box>
           <Typography variant="h6" gutterBottom>
@@ -3968,7 +4120,7 @@ const Profile = () => {
       );
     }
 
-    if (tabValue === 9) {
+    if (currentSectionIndex === 9) {
       return (
         <Box>
           <Typography variant="h6" gutterBottom>
@@ -4071,7 +4223,7 @@ const Profile = () => {
       );
     }
 
-    if (tabValue === 10) {
+    if (currentSectionIndex === 6) {
       return (
         <Box>
           <Typography variant="h6" gutterBottom>
@@ -4236,7 +4388,21 @@ const Profile = () => {
       );
     }
 
-    const fields = formFields[tabValue] || [];
+    const sectionToFormFieldMap = {
+      0: 0,
+      1: 1,
+      2: 2,
+      3: 4,
+      4: 5,
+      5: 6,
+      6: 10,
+      7: 7,
+      8: 8,
+      9: 9,
+    };
+    const formFieldIndex =
+      sectionToFormFieldMap[currentSectionIndex] ?? currentSectionIndex;
+    const fields = formFields[formFieldIndex] || [];
 
     return (
       <Grid container spacing={3}>
@@ -4262,133 +4428,199 @@ const Profile = () => {
   const hexToRgb = (hex) => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result
-      ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`
+      ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(
+          result[3],
+          16
+        )}`
       : '109, 35, 35';
   };
 
-  return (
-    <Box
-      ref={profileRef}
-      sx={{
-        py: 4,
-        px: { xs: 1.5, md: 3 },
-        minHeight: '100vh',
-        backgroundColor: colors.background,
-      }}
-    >
-      <Container maxWidth="xl">
-        <Stack spacing={2}>
-          {/* Header: wide, simple, social-profile style */}
-          <GlassCard
-            sx={{
-              px: { xs: 2.5, md: 4 },
-              py: { xs: 2.5, md: 3 },
-              display: 'flex',
-              alignItems: 'center',
-              gap: { xs: 2, md: 3 },
-            }}
-          >
-            <Avatar
-              src={
-                profilePicture
-                  ? `${API_BASE_URL}${profilePicture}?t=${Date.now()}`
-                  : undefined
-              }
-              onClick={handleImageZoom}
-              sx={{
-                width: 96,
-                height: 96,
-                cursor: 'pointer',
-                border: `3px solid ${colors.border}`,
-                bgcolor: alpha(colors.primary, 0.1),
-              }}
-            >
-              {!profilePicture && (
-                <PersonIcon sx={{ color: colors.primary, fontSize: 42 }} />
-              )}
-            </Avatar>
+  const currentSection =
+    navigationSections[currentSectionIndex] || navigationSections[0];
 
-            <Box flex={1} minWidth={0}>
+  return (
+    <ProfileWrapper ref={profileRef}>
+      {/* TOP NAVIGATION BAR */}
+      <ProfileAppBar position="static" elevation={0}>
+        <ProfileToolbar
+          sx={{
+            minHeight: 140,
+            display: 'flex',
+            alignItems: 'center',
+            py: 3,
+          }}
+        >
+          <BrandSection>
+            {/* Avatar & Name */}
+            <Box
+              sx={{ position: 'relative', cursor: 'pointer' }}
+              onClick={handleImageZoom}
+            >
+              <Avatar
+                src={
+                  profilePicture
+                    ? `${API_BASE_URL}${profilePicture}?t=${Date.now()}`
+                    : undefined
+                }
+                sx={{
+                  width: 80,
+                  height: 80,
+                  border: '3px solid #E5E5E5',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                }}
+              >
+                {!profilePicture && (
+                  <PersonIcon sx={{ color: colors.primary, fontSize: 40 }} />
+                )}
+              </Avatar>
+              <input
+                accept="image/*"
+                id="profile-picture-upload-nav"
+                type="file"
+                style={{ display: 'none' }}
+                onChange={handlePictureChange}
+              />
+              <IconButton
+                component="label"
+                htmlFor="profile-picture-upload-nav"
+                size="small"
+                sx={{
+                  position: 'absolute',
+                  bottom: 0,
+                  right: 0,
+                  backgroundColor: colors.primary,
+                  color: '#fff',
+                  width: 28,
+                  height: 28,
+                  padding: 0,
+                  '&:hover': { backgroundColor: colors.primaryDark },
+                  '& .MuiSvgIcon-root': { fontSize: 16 },
+                }}
+              >
+                <CameraAltIcon />
+              </IconButton>
+            </Box>
+            <ProfileInfoCompact>
               <Typography
-                variant="h5"
-                sx={{ fontWeight: 700, mb: 0.5, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}
+                variant="h4"
+                sx={{
+                  fontWeight: 700,
+                  fontSize: '1.75rem',
+                  color: colors.primary,
+                  lineHeight: 1.2,
+                  mb: 0.5,
+                }}
               >
                 {person
-                  ? `${person.firstName} ${person.middleName} ${person.lastName} ${
-                      person.nameExtension || ''
-                    }`.trim()
+                  ? `${person.firstName} ${person.lastName}`.trim()
                   : 'Employee Profile'}
               </Typography>
               <Typography
                 variant="body2"
                 color={colors.textSecondary}
-                sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                sx={{
+                  fontWeight: 500,
+                  fontSize: '0.95rem',
+                }}
               >
-                <BadgeIcon fontSize="small" />
-                Employee No.: <strong>{person?.agencyEmployeeNum || '—'}</strong>
+                {person?.agencyEmployeeNum
+                  ? `Employee ID: ${person.agencyEmployeeNum}`
+                  : '—'}
               </Typography>
-            </Box>
+            </ProfileInfoCompact>
+          </BrandSection>
 
-            <Stack
-              direction="row"
-              spacing={1.5}
-              sx={{ flexShrink: 0 }}
-            >
-              <Button
-                variant="outlined"
-                startIcon={<RefreshIcon />}
+          {/* Global Actions */}
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
+            <Tooltip title="Refresh Data">
+              <IconButton
                 onClick={handleRefresh}
+                color="inherit"
+                sx={{
+                  width: 44,
+                  height: 44,
+                  border: '1px solid #E5E5E5',
+                  '&:hover': {
+                    borderColor: colors.primary,
+                    backgroundColor: alpha(colors.primary, 0.05),
+                  },
+                }}
               >
-                Refresh
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<EditIcon />}
-                onClick={handleEditOpen}
-              >
-                Edit Profile
-              </Button>
-            </Stack>
-          </GlassCard>
-
-          {/* Tabs + content: full-width like a feed */}
-          <GlassCard>
-            <Box
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
+            <ActionButton
+              variant="contained"
+              startIcon={<EditIcon />}
+              onClick={handleEditOpen}
               sx={{
-                borderBottom: `1px solid ${alpha(colors.primary, 0.12)}`,
-                px: { xs: 1.5, md: 2.5 },
-                pt: 2,
+                px: 3,
+                py: 1.5,
+                fontSize: '0.95rem',
+                height: 44,
               }}
             >
-              <Tabs
-                value={tabValue}
-                onChange={handleTabChange}
-                variant="scrollable"
-                scrollButtons="auto"
-                allowScrollButtonsMobile
-              >
-                {tabs.map((tab) => (
-                  <Tab
-                    key={tab.key}
-                    icon={tab.icon}
-                    iconPosition="start"
-                    label={tab.label}
-                    sx={{
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      minHeight: 46,
-                    }}
-                  />
-                ))}
-              </Tabs>
-            </Box>
+              Edit Profile
+            </ActionButton>
+          </Box>
+        </ProfileToolbar>
+      </ProfileAppBar>
 
-            <Box sx={{ px: { xs: 1.5, md: 3 }, py: 2.5 }}>
-              {renderTabContentList(tabValue)}
-            </Box>
-          </GlassCard>
-        </Stack>
+      <Container sx={{ mt: 3, mb: 2 }}>
+        <PageHeaderBox>
+          <HeaderTitles>
+            <HeaderTitle>{currentSection?.title || 'Profile'}</HeaderTitle>
+            <HeaderSubtitle>
+              {currentSection?.subtitle || 'View your profile information'}
+            </HeaderSubtitle>
+          </HeaderTitles>
+          <NavControls>
+            <NavButton
+              onClick={handlePrevSection}
+              disabled={currentSectionIndex === 0}
+              title="Previous Section"
+            >
+              <ArrowBackIosIcon fontSize="small" />
+            </NavButton>
+            <NavButton
+              onClick={handleNextSection}
+              disabled={currentSectionIndex === navigationSections.length - 1}
+              title="Next Section"
+            >
+              <ArrowForwardIosIcon fontSize="small" />
+            </NavButton>
+          </NavControls>
+        </PageHeaderBox>
       </Container>
+
+      {/* NAVIGATION TABS BAR */}
+      <NavTabsContainer>
+        <NavTabs
+          value={currentSectionIndex}
+          onChange={(e, newValue) => handleSectionChange(newValue)}
+          variant="scrollable"
+          scrollButtons="auto"
+          aria-label="Profile Sections"
+        >
+          {navigationSections.map((section) => (
+            <Tab key={section.key} label={section.label} icon={section.icon} />
+          ))}
+        </NavTabs>
+      </NavTabsContainer>
+
+      {/* MAIN CONTENT AREA */}
+      <MainContent>
+        <Box>
+          {navigationSections.map((section, index) => (
+            <ContentSection
+              key={section.key}
+              active={currentSectionIndex === index}
+            >
+              {renderContentSection(index)}
+            </ContentSection>
+          ))}
+        </Box>
+      </MainContent>
 
       {/* Edit Profile Modal */}
       <Modal
@@ -4406,7 +4638,12 @@ const Profile = () => {
               <ModalTitle>Edit Profile</ModalTitle>
               <IconButton
                 onClick={handleEditClose}
-                sx={{ color: colors.textLight }}
+                sx={{
+                  color: colors.textLight,
+                  position: 'absolute',
+                  top: 8,
+                  right: 8,
+                }}
               >
                 <CloseIcon />
               </IconButton>
@@ -4494,7 +4731,7 @@ const Profile = () => {
             <ModalBody>
               <Box sx={{ mb: 3 }}>
                 <CustomTabs
-                  value={tabValue}
+                  value={currentSectionIndex}
                   onChange={handleTabChange}
                   variant="scrollable"
                   scrollButtons="auto"
@@ -4513,7 +4750,6 @@ const Profile = () => {
               {renderFormFields()}
             </ModalBody>
 
-            {/* Fixed Bottom Action Bar - Right Aligned */}
             <Box
               sx={{
                 position: 'sticky',
@@ -4691,7 +4927,7 @@ const Profile = () => {
           <KeyboardArrowUpIcon />
         </FloatingButton>
       )}
-    </Box>
+    </ProfileWrapper>
   );
 };
 
