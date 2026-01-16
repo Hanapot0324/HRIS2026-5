@@ -948,7 +948,7 @@ const DailyTimeRecord = () => {
                             </td>
                             <td></td>
                             <td></td>
-                            <td
+                            {/* <td
                               style={{
                                 position: 'absolute',
                                 left: '60%',
@@ -1002,7 +1002,7 @@ const DailyTimeRecord = () => {
                                   </div>
                                 );
                               })}
-                            </td>
+                            </td> */}
                             <td></td>
                             <td></td>
                           </tr>
@@ -1214,9 +1214,29 @@ const DailyTimeRecord = () => {
                                       margin: '5px 0',
                                     }}
                                   >
-                                    I certify on my honor that the above is a
+                                    I CERTIFY on my honor that the above is a
                                     true and correct report of the hours of work
-                                    performed...
+                                    performed, record of which was made daily at
+                                    the time of arrival and at the time of
+                                    departure from office.
+                                  </p>
+                                  <hr
+                                    style={{
+                                      borderTop: '1px solid black',
+                                      width: '50%',
+                                      marginTop: '15px',
+                                      marginLeft: '180px',
+                                    }}
+                                  />
+                                  <p
+                                    style={{
+                                      textAlign: 'center',
+                                      fontSize: '9px',
+                                      fontFamily: 'Arial, serif',
+                                      marginLeft: '180px',
+                                    }}
+                                  >
+                                    Signature
                                   </p>
                                   <hr
                                     style={{
@@ -1227,12 +1247,38 @@ const DailyTimeRecord = () => {
                                   />
                                   <p
                                     style={{
-                                      textAlign: 'center',
+                                      paddingLeft: '30px',
                                       fontSize: '9px',
                                       fontFamily: 'Arial, serif',
                                     }}
                                   >
                                     Verified as to prescribed office hours.
+                                  </p>
+                                  <hr
+                                    style={{
+                                      borderTop: '1px solid black',
+                                      width: '60%',
+                                      marginTop: '15px',
+                                      marginLeft: '150px',
+                                    }}
+                                  />
+                                  <p
+                                    style={{
+                                      paddingLeft: '250px',
+                                      fontSize: '9px',
+                                      fontFamily: 'Arial, serif',
+                                    }}
+                                  >
+                                    In-Charge
+                                  </p>
+                                  <p
+                                    style={{
+                                      paddingLeft: '200px',
+                                      fontSize: '9px',
+                                      fontFamily: 'Arial, serif',
+                                    }}
+                                  >
+                                    (Signature Over Printed Name)
                                   </p>
                                 </td>
                               </tr>
@@ -1297,9 +1343,29 @@ const DailyTimeRecord = () => {
                                       margin: '5px 0',
                                     }}
                                   >
-                                    I certify on my honor that the above is a
+                                    I CERTIFY on my honor that the above is a
                                     true and correct report of the hours of work
-                                    performed...
+                                    performed, record of which was made daily at
+                                    the time of arrival and at the time of
+                                    departure from office.
+                                  </p>
+                                  <hr
+                                    style={{
+                                      borderTop: '1px solid black',
+                                      width: '50%',
+                                      marginTop: '15px',
+                                      marginLeft: '180px',
+                                    }}
+                                  />
+                                  <p
+                                    style={{
+                                      textAlign: 'center',
+                                      fontSize: '9px',
+                                      fontFamily: 'Arial, serif',
+                                      marginLeft: '180px',
+                                    }}
+                                  >
+                                    Signature
                                   </p>
                                   <hr
                                     style={{
@@ -1310,12 +1376,38 @@ const DailyTimeRecord = () => {
                                   />
                                   <p
                                     style={{
-                                      textAlign: 'center',
+                                      paddingLeft: '30px',
                                       fontSize: '9px',
                                       fontFamily: 'Arial, serif',
                                     }}
                                   >
                                     Verified as to prescribed office hours.
+                                  </p>
+                                  <hr
+                                    style={{
+                                      borderTop: '1px solid black',
+                                      width: '60%',
+                                      marginTop: '15px',
+                                      marginLeft: '150px',
+                                    }}
+                                  />
+                                  <p
+                                    style={{
+                                      paddingLeft: '250px',
+                                      fontSize: '9px',
+                                      fontFamily: 'Arial, serif',
+                                    }}
+                                  >
+                                    In-Charge
+                                  </p>
+                                  <p
+                                    style={{
+                                      paddingLeft: '200px',
+                                      fontSize: '9px',
+                                      fontFamily: 'Arial, serif',
+                                    }}
+                                  >
+                                    (Signature Over Printed Name)
                                   </p>
                                 </td>
                               </tr>

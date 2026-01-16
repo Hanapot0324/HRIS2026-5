@@ -56,15 +56,10 @@ const confidentialPasswordRoutes = require('./routes/confidential-password');
 
 const app = express();
 
-// Middleware
-app.use(express.json());
-app.use(bodyparser.json());
-app.use(express.urlencoded({ extended: true }));
-
-// CORS configuration
+// CORS configuration - MUST be before body parsing middleware
 const allowedOrigins = [
   'http://localhost:5137',
-  'http://192.168.50.106:5137',
+  'http://192.168.50.82:5137',
   'http://192.168.50.45:5137',
   'http://136.239.248.42:5137',
   'http://192.168.50.97:5137',
@@ -73,6 +68,7 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
       if (allowedOrigins.indexOf(origin) !== -1) {
         callback(null, true);
@@ -81,8 +77,17 @@ app.use(
       }
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['Content-Type', 'Authorization'],
   })
 );
+
+// Body parsing middleware - AFTER CORS
+// Increase payload size limit to handle bulk operations (default is 100kb)
+app.use(express.json({ limit: '50mb' }));
+app.use(bodyparser.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Static file serving
 app.use('/uploads', express.static('uploads'));

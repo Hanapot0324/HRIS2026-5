@@ -2,6 +2,8 @@ import API_BASE_URL from '../apiConfig';
 import React, { useState, useEffect } from 'react';
 import usePageAccess from '../hooks/usePageAccess';
 import AccessDenied from './AccessDenied';
+import LoadingOverlay from './LoadingOverlay';
+import SuccessfulOverlay from './SuccessfulOverlay';
 import {
   Container,
   Paper,
@@ -39,10 +41,24 @@ const BulkRegister = () => {
   const [success, setSuccess] = useState([]);
   const [errors, setErrors] = useState([]);
   const [errMessage, setErrMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const [completedSteps, setCompletedSteps] = useState({
     remittance: false,
     department: false,
     itemTable: false,
+  });
+
+  // Field requirements state
+  const [fieldRequirements, setFieldRequirements] = useState({
+    firstName: true,
+    lastName: true,
+    email: true,
+    employeeNumber: true,
+    employmentCategory: true,
+    password: true,
+    middleName: false,
+    nameExtension: false,
   });
 
   const navigate = useNavigate();
@@ -59,6 +75,39 @@ const BulkRegister = () => {
     if (saved) {
       setCompletedSteps(JSON.parse(saved));
     }
+  }, []);
+
+  // Fetch field requirements from system settings
+  useEffect(() => {
+    const fetchFieldRequirements = async () => {
+      try {
+        const token =
+          localStorage.getItem('token') || sessionStorage.getItem('token');
+        const response = await fetch(
+          `${API_BASE_URL}/api/system-settings/registration_field_requirements`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.setting_value) {
+            try {
+              const requirements = JSON.parse(data.setting_value);
+              setFieldRequirements(requirements);
+            } catch (parseErr) {
+              console.error('Error parsing field requirements:', parseErr);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching field requirements:', err);
+        // Use defaults if fetch fails
+      }
+    };
+    fetchFieldRequirements();
   }, []);
 
   // Dynamic page access control using component identifier
@@ -87,22 +136,33 @@ const BulkRegister = () => {
         }
 
         const firstRow = worksheet[0];
-        const requiredFields = [
-          'employeeNumber',
-          'firstName',
-          'lastName',
-          'email',
-          'employmentCategory',
-        ];
+        // Build required fields list dynamically based on field requirements
+        const requiredFields = [];
+        if (fieldRequirements.firstName) requiredFields.push('firstName');
+        if (fieldRequirements.lastName) requiredFields.push('lastName');
+        if (fieldRequirements.email) requiredFields.push('email');
+        if (fieldRequirements.employeeNumber) requiredFields.push('employeeNumber');
+        if (fieldRequirements.employmentCategory) requiredFields.push('employmentCategory');
+        if (fieldRequirements.password) requiredFields.push('password');
+
         const missingFields = requiredFields.filter(
           (field) => !(field in firstRow)
         );
 
         if (missingFields.length > 0) {
+          const optionalFields = [];
+          if (!fieldRequirements.firstName) optionalFields.push('firstName');
+          if (!fieldRequirements.lastName) optionalFields.push('lastName');
+          if (!fieldRequirements.email) optionalFields.push('email');
+          if (!fieldRequirements.employeeNumber) optionalFields.push('employeeNumber');
+          if (!fieldRequirements.employmentCategory) optionalFields.push('employmentCategory');
+          if (!fieldRequirements.password) optionalFields.push('password');
+          optionalFields.push('middleName', 'nameExtension');
+
           setErrMessage(
             `Missing required columns: ${missingFields.join(
               ', '
-            )}. Expected columns: employeeNumber, firstName, lastName, email, employmentCategory, middleName (optional), nameExtension (optional)`
+            )}. ${optionalFields.length > 0 ? `Optional columns: ${optionalFields.join(', ')}` : ''}`
           );
           return;
         }
@@ -110,13 +170,15 @@ const BulkRegister = () => {
         const processedUsers = worksheet.map((user, index) => {
           let employmentCategory =
             user.employmentCategory?.toString().trim().toLowerCase() || '';
-          let employmentCategoryValue = '';
+          let employmentCategoryValue = null; // Default to null instead of empty string
 
           if (employmentCategory === 'regular') {
             employmentCategoryValue = '1';
           } else if (employmentCategory === 'jo') {
             employmentCategoryValue = '0';
           }
+          // If employmentCategory is not required and not provided, leave it as null
+          // The backend will set a default value if needed
 
           // Generate password from lastName if not provided
           let password = user.password?.toString().trim() || '';
@@ -129,35 +191,68 @@ const BulkRegister = () => {
               .replace(/\s+/g, '');
           }
 
+          // Process employeeNumber: remove dashes
+          let employeeNumber = user.employeeNumber?.toString().trim() || '';
+          if (employeeNumber) {
+            employeeNumber = employeeNumber.replace(/-/g, '');
+          }
+
           const processedUser = {
             firstName: user.firstName?.toString().trim() || '',
             middleName: user.middleName?.toString().trim() || null,
             lastName: user.lastName?.toString().trim() || '',
             nameExtension: user.nameExtension?.toString().trim() || null,
-            employmentCategory: employmentCategoryValue,
             email: user.email?.toString().trim() || '',
-            employeeNumber: user.employeeNumber?.toString().trim() || '',
+            employeeNumber: employeeNumber,
             password: password,
             role: 'staff',
             access_level: 'user',
           };
+
+          // Only include employmentCategory if it has a valid value
+          // If not required and not provided, omit it (backend will set default)
+          if (employmentCategoryValue === '0' || employmentCategoryValue === '1') {
+            processedUser.employmentCategory = employmentCategoryValue;
+          } else if (fieldRequirements.employmentCategory) {
+            // Required but not provided - will be caught by validation
+            processedUser.employmentCategory = null;
+          }
+          // If not required and not provided, don't include the field at all
 
           return processedUser;
         });
 
         const validationErrors = [];
         processedUsers.forEach((user, index) => {
-          if (
-            !user.firstName ||
-            !user.lastName ||
-            !user.email ||
-            !user.employeeNumber ||
-            !user.password
-          ) {
-            validationErrors.push(`Row ${index + 2}: Missing required fields`);
+          // Dynamic validation based on field requirements
+          const missingFields = [];
+          if (fieldRequirements.firstName && !user.firstName) {
+            missingFields.push('firstName');
+          }
+          if (fieldRequirements.lastName && !user.lastName) {
+            missingFields.push('lastName');
+          }
+          if (fieldRequirements.email && !user.email) {
+            missingFields.push('email');
+          }
+          if (fieldRequirements.employeeNumber && !user.employeeNumber) {
+            missingFields.push('employeeNumber');
+          }
+          if (fieldRequirements.password && !user.password) {
+            missingFields.push('password');
+          }
+          if (fieldRequirements.employmentCategory && !user.employmentCategory) {
+            missingFields.push('employmentCategory');
           }
 
-          if (!user.employmentCategory) {
+          if (missingFields.length > 0) {
+            validationErrors.push(
+              `Row ${index + 2}: Missing required fields: ${missingFields.join(', ')}`
+            );
+          }
+
+          // Validate employmentCategory format if it's provided
+          if (user.employmentCategory && user.employmentCategory !== '0' && user.employmentCategory !== '1') {
             validationErrors.push(
               `Row ${
                 index + 2
@@ -199,6 +294,9 @@ const BulkRegister = () => {
       return;
     }
 
+    setIsLoading(true);
+    setErrMessage('');
+
     try {
       const response = await fetch(`${API_BASE_URL}/excel-register`, {
         method: 'POST',
@@ -206,17 +304,37 @@ const BulkRegister = () => {
         body: JSON.stringify({ users }),
       });
 
+      if (!response.ok) {
+        // Try to parse error message
+        let errorMessage = 'Registration failed.';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseErr) {
+          errorMessage = `Server error: ${response.status} ${response.statusText}`;
+        }
+        setErrMessage(errorMessage);
+        setIsLoading(false);
+        return;
+      }
+
       const result = await response.json();
-      if (response.ok) {
-        setSuccess(result.successful || []);
-        setErrors(result.errors || []);
-        setErrMessage('');
-      } else {
-        setErrMessage(result.message || 'Registration failed.');
+      setSuccess(result.successful || []);
+      setErrors(result.errors || []);
+      setIsLoading(false);
+      
+      // Show success overlay if there are successful registrations
+      if (result.successful && result.successful.length > 0) {
+        setShowSuccessOverlay(true);
       }
     } catch (err) {
       console.error('Error uploading Excel:', err);
-      setErrMessage('Something went wrong while uploading.');
+      setIsLoading(false);
+      if (err.message.includes('Failed to fetch') || err.message.includes('CORS')) {
+        setErrMessage('Cannot connect to server. Please check if the backend server is running and CORS is properly configured.');
+      } else {
+        setErrMessage(`Something went wrong while uploading: ${err.message}`);
+      }
     }
   };
 
@@ -680,25 +798,28 @@ const BulkRegister = () => {
                           sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}
                         >
                           {[
-                            'employeeNumber',
-                            'firstName',
-                            'lastName',
-                            'email',
-                            'employmentCategory',
-                          ].map((field) => (
-                            <Chip
-                              key={field}
-                              label={field}
-                              size="small"
-                              sx={{
-                                bgcolor: primaryColor,
-                                color: whiteColor,
-                                fontSize: '0.7rem',
-                                fontWeight: 500,
-                                height: 22,
-                              }}
-                            />
-                          ))}
+                            { key: 'firstName', label: 'firstName' },
+                            { key: 'lastName', label: 'lastName' },
+                            { key: 'email', label: 'email' },
+                            { key: 'employeeNumber', label: 'employeeNumber' },
+                            { key: 'employmentCategory', label: 'employmentCategory' },
+                            { key: 'password', label: 'password' },
+                          ]
+                            .filter((field) => fieldRequirements[field.key])
+                            .map((field) => (
+                              <Chip
+                                key={field.key}
+                                label={field.label}
+                                size="small"
+                                sx={{
+                                  bgcolor: primaryColor,
+                                  color: whiteColor,
+                                  fontSize: '0.7rem',
+                                  fontWeight: 500,
+                                  height: 22,
+                                }}
+                              />
+                            ))}
                         </Box>
                       </Grid>
                       <Grid item xs={12} md={6}>
@@ -716,11 +837,21 @@ const BulkRegister = () => {
                         <Box
                           sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}
                         >
-                          {['middleName', 'nameExtension', 'password'].map(
-                            (field) => (
+                          {[
+                            { key: 'firstName', label: 'firstName' },
+                            { key: 'lastName', label: 'lastName' },
+                            { key: 'email', label: 'email' },
+                            { key: 'employeeNumber', label: 'employeeNumber' },
+                            { key: 'employmentCategory', label: 'employmentCategory' },
+                            { key: 'password', label: 'password' },
+                            { key: 'middleName', label: 'middleName' },
+                            { key: 'nameExtension', label: 'nameExtension' },
+                          ]
+                            .filter((field) => !fieldRequirements[field.key])
+                            .map((field) => (
                               <Chip
-                                key={field}
-                                label={field}
+                                key={field.key}
+                                label={field.label}
                                 size="small"
                                 variant="outlined"
                                 sx={{
@@ -730,8 +861,7 @@ const BulkRegister = () => {
                                   height: 22,
                                 }}
                               />
-                            )
-                          )}
+                            ))}
                         </Box>
                       </Grid>
                     </Grid>
@@ -755,6 +885,9 @@ const BulkRegister = () => {
                         <br />
                         <strong>EmploymentCategory</strong> must be either{' '}
                         <strong>"Regular"</strong> or <strong>"JO"</strong>
+                        <br />
+                        <strong>EmployeeNumber</strong> accepts alphanumeric characters with hyphens (e.g.,{' '}
+                        <strong>2013-4410</strong> or <strong>2013-4507M</strong>)
                         <br />
                         <strong>Password</strong> is automatically set to the{' '}
                         <strong>last name</strong> in{' '}
@@ -1099,6 +1232,20 @@ const BulkRegister = () => {
           </Box>
         </Grid>
       </Grid>
+
+      {/* Loading Overlay */}
+      <LoadingOverlay 
+        open={isLoading} 
+        message={`Uploading ${users.length} user${users.length !== 1 ? 's' : ''}...`}
+      />
+
+      {/* Success Overlay */}
+      <SuccessfulOverlay
+        open={showSuccessOverlay}
+        action="create"
+        onClose={() => setShowSuccessOverlay(false)}
+        showOkButton={true}
+      />
     </Container>
   );
 };

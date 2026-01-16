@@ -214,10 +214,10 @@ const OfficialTimeForm = () => {
   ].map((day) => ({
     employeeID,
     day,
-    officialTimeIN: '00:00:00 AM',
+    officialTimeIN: '08:00:00 AM',
     officialBreaktimeIN: '00:00:00 AM',
     officialBreaktimeOUT: '00:00:00 PM',
-    officialTimeOUT: '00:00:00 PM',
+    officialTimeOUT: '05:00:00 PM',
     officialHonorariumTimeIN: '00:00:00 AM',
     officialHonorariumTimeOUT: '00:00:00 PM',
     officialServiceCreditTimeIN: '00:00:00 AM',

@@ -119,6 +119,18 @@ const AdminSecurity = () => {
   // Global MFA states
   const [globalMFAEnabled, setGlobalMFAEnabled] = useState(true);
 
+  // Field requirements states
+  const [fieldRequirements, setFieldRequirements] = useState({
+    firstName: true,
+    lastName: true,
+    email: true,
+    employeeNumber: true,
+    employmentCategory: true,
+    password: true,
+    middleName: false,
+    nameExtension: false,
+  });
+
   const employeeNumber = localStorage.getItem("employeeNumber");
 
   // Get user role from token
@@ -181,8 +193,32 @@ const AdminSecurity = () => {
       }
     };
 
+    // Fetch field requirements
+    const fetchFieldRequirements = async () => {
+      try {
+        const token =
+          localStorage.getItem("token") || sessionStorage.getItem("token");
+        const response = await axios.get(
+          `${API_BASE_URL}/api/system-settings/registration_field_requirements`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (response.data && response.data.setting_value) {
+          try {
+            const requirements = JSON.parse(response.data.setting_value);
+            setFieldRequirements(requirements);
+          } catch (parseErr) {
+            console.error("Error parsing field requirements:", parseErr);
+          }
+        }
+      } catch (err) {
+        // If setting doesn't exist, use defaults
+        console.log("Field requirements not found, using defaults");
+      }
+    };
+
     fetchPasswordInfo();
     fetchGlobalMFA();
+    fetchFieldRequirements();
   }, [navigate]);
 
   // Handle confidential password creation/update
@@ -278,6 +314,40 @@ const AdminSecurity = () => {
       console.error("Error updating global MFA setting:", err);
       setErrorMessage("Failed to update global MFA setting. Please try again.");
       setGlobalMFAEnabled(!newValue);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle field requirement toggle
+  const handleToggleFieldRequirement = async (fieldName, newValue) => {
+    setLoading(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      const updatedRequirements = {
+        ...fieldRequirements,
+        [fieldName]: newValue,
+      };
+      setFieldRequirements(updatedRequirements);
+
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
+      await axios.put(
+        `${API_BASE_URL}/api/system-settings/registration_field_requirements`,
+        { value: JSON.stringify(updatedRequirements) },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setSuccessMessage(
+        `${fieldName.charAt(0).toUpperCase() + fieldName.slice(1)} is now ${newValue ? "required" : "optional"} for user registration.`
+      );
+      setTimeout(() => setSuccessMessage(""), 5000);
+    } catch (err) {
+      console.error("Error updating field requirements:", err);
+      setErrorMessage("Failed to update field requirements. Please try again.");
+      // Revert the change
+      setFieldRequirements(fieldRequirements);
     } finally {
       setLoading(false);
     }
@@ -554,6 +624,163 @@ const AdminSecurity = () => {
                       • When disabled, users can control their own MFA from Settings
                       <br />
                       • Only superadmin and administrator can modify this setting
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </GlassCard>
+          </Grid>
+
+          {/* Field Requirements Section */}
+          <Grid item xs={12} md={6}>
+            <GlassCard
+              sx={{
+                background: `rgba(${hexToRgb(accentColor)}, 0.95)`,
+                boxShadow: `0 8px 40px ${alpha(primaryColor, 0.08)}`,
+                border: `1px solid ${alpha(primaryColor, 0.1)}`,
+                "&:hover": {
+                  boxShadow: `0 12px 48px ${alpha(primaryColor, 0.15)}`,
+                },
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <CardContent
+                sx={{
+                  p: 0,
+                  flex: "1 1 auto",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <Box
+                  sx={{
+                    p: 3,
+                    background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`,
+                    color: "white",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 2,
+                  }}
+                >
+                  <AdminPanelSettings sx={{ fontSize: 28 }} />
+                  <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                    Registration Field Requirements
+                  </Typography>
+                </Box>
+                <Box sx={{ p: 4, flex: "1 1 auto", overflow: "auto" }}>
+                  <Typography
+                    variant="body1"
+                    sx={{ mb: 3, color: "#666", lineHeight: 1.6 }}
+                  >
+                    Configure which fields are required or optional for user registration. 
+                    Changes will apply to both Single Registration and Bulk Registration forms.
+                  </Typography>
+
+                  <Box sx={{ mb: 3 }}>
+                    {[
+                      { key: "firstName", label: "First Name" },
+                      { key: "lastName", label: "Last Name" },
+                      { key: "email", label: "Email Address" },
+                      { key: "employeeNumber", label: "Employee Number" },
+                      { key: "employmentCategory", label: "Employment Category" },
+                      { key: "password", label: "Password" },
+                      { key: "middleName", label: "Middle Name" },
+                      { key: "nameExtension", label: "Name Extension" },
+                    ].map((field) => (
+                      <GlassCard
+                        key={field.key}
+                        sx={{
+                          mb: 2,
+                          backgroundColor: "white",
+                          border: `2px solid ${primaryColor}40`,
+                          borderRadius: 2,
+                        }}
+                      >
+                        <CardContent>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Box>
+                              <Typography
+                                variant="h6"
+                                sx={{
+                                  color: primaryColor,
+                                  fontWeight: 600,
+                                  mb: 0.5,
+                                  fontSize: "1rem",
+                                }}
+                              >
+                                {field.label}
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                sx={{ color: "#666", fontSize: "0.85rem" }}
+                              >
+                                {fieldRequirements[field.key]
+                                  ? "Required field - users must fill this in"
+                                  : "Optional field - users can skip this"}
+                              </Typography>
+                            </Box>
+                            <Switch
+                              checked={fieldRequirements[field.key] || false}
+                              onChange={(e) =>
+                                handleToggleFieldRequirement(
+                                  field.key,
+                                  e.target.checked
+                                )
+                              }
+                              disabled={loading}
+                              sx={{
+                                "& .MuiSwitch-switchBase.Mui-checked": {
+                                  color: primaryColor,
+                                },
+                                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
+                                  {
+                                    backgroundColor: primaryColor,
+                                  },
+                              }}
+                            />
+                          </Box>
+                        </CardContent>
+                      </GlassCard>
+                    ))}
+                  </Box>
+
+                  <Box
+                    sx={{
+                      p: 3,
+                      borderRadius: 2,
+                      backgroundColor: "#f8f9fa",
+                      border: `1px solid ${primaryColor}20`,
+                    }}
+                  >
+                    <Typography
+                      variant="subtitle1"
+                      sx={{
+                        color: primaryColor,
+                        fontWeight: 600,
+                        mb: 2,
+                      }}
+                    >
+                      How it works:
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "#666", lineHeight: 1.8 }}
+                    >
+                      • Required fields must be filled before registration can proceed
+                      <br />
+                      • Optional fields can be left empty
+                      <br />
+                      • Changes apply immediately to both registration forms
+                      <br />
+                      • Only superadmin and administrator can modify these settings
                     </Typography>
                   </Box>
                 </Box>

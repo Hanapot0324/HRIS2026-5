@@ -430,6 +430,40 @@ router.post('/excel-register', async (req, res) => {
   const errors = [];
 
   try {
+    // Fetch field requirements from system settings
+    let fieldRequirements = {
+      firstName: true,
+      lastName: true,
+      email: true,
+      employeeNumber: true,
+      employmentCategory: true,
+      password: true,
+      middleName: false,
+      nameExtension: false,
+    };
+
+    try {
+      const settingsQuery = `SELECT setting_value FROM system_settings WHERE setting_key = 'registration_field_requirements'`;
+      await new Promise((resolve, reject) => {
+        db.query(settingsQuery, (err, rows) => {
+          if (err) {
+            console.error('Error fetching field requirements:', err);
+            return resolve(); // Use defaults
+          }
+          if (rows.length > 0 && rows[0].setting_value) {
+            try {
+              fieldRequirements = JSON.parse(rows[0].setting_value);
+            } catch (parseErr) {
+              console.error('Error parsing field requirements:', parseErr);
+            }
+          }
+          resolve();
+        });
+      });
+    } catch (settingsErr) {
+      console.error('Error loading field requirements, using defaults:', settingsErr);
+    }
+
     await Promise.all(
       users.map(
         (user) =>
@@ -443,15 +477,35 @@ router.post('/excel-register', async (req, res) => {
               .filter(Boolean)
               .join(' ');
 
-            // Validate employmentCategory
-            if (
-              user.employmentCategory !== '0' &&
-              user.employmentCategory !== '1'
-            ) {
-              errors.push(
-                `Invalid employmentCategory for ${user.employeeNumber}: Must be '0' (JO) or '1' (Regular)`
-              );
-              return resolve();
+            // Validate employmentCategory based on field requirements
+            if (fieldRequirements.employmentCategory) {
+              // Field is required, validate it
+              if (
+                user.employmentCategory !== '0' &&
+                user.employmentCategory !== '1'
+              ) {
+                errors.push(
+                  `Invalid employmentCategory for ${user.employeeNumber}: Must be '0' (JO) or '1' (Regular)`
+                );
+                return resolve();
+              }
+            } else {
+              // Field is not required
+              // If provided, validate it; otherwise set default
+              if (user.employmentCategory === '0' || user.employmentCategory === '1') {
+                // Valid value provided, use it
+              } else if (user.employmentCategory !== undefined && 
+                         user.employmentCategory !== null && 
+                         user.employmentCategory !== '') {
+                // Invalid value provided
+                errors.push(
+                  `Invalid employmentCategory for ${user.employeeNumber}: Must be '0' (JO) or '1' (Regular)`
+                );
+                return resolve();
+              } else {
+                // Not provided or empty, set default to '1' (Regular)
+                user.employmentCategory = '1';
+              }
             }
 
             // Check if employee number already exists
@@ -544,19 +598,18 @@ router.post('/excel-register', async (req, res) => {
                           return resolve();
                         }
 
-                        // INSERT INTO employment_category table
-                        const empCatQuery = `
-                          INSERT INTO employment_category (employeeNumber, employmentCategory)
-                          VALUES (?, ?)
+                        // Check if employment_category already exists
+                        const checkEmpCatQuery = `
+                          SELECT employeeNumber FROM employment_category WHERE employeeNumber = ?
                         `;
 
                         db.query(
-                          empCatQuery,
-                          [user.employeeNumber, user.employmentCategory],
-                          async (catErr) => {
-                            if (catErr) {
+                          checkEmpCatQuery,
+                          [user.employeeNumber],
+                          (checkErr, existingEmpCat) => {
+                            if (checkErr) {
                               errors.push(
-                                `Error inserting employment category ${user.employeeNumber}: ${catErr.message}`
+                                `Error checking employment category ${user.employeeNumber}: ${checkErr.message}`
                               );
                               // Rollback
                               db.query(
@@ -570,8 +623,49 @@ router.post('/excel-register', async (req, res) => {
                               return resolve();
                             }
 
-                            // SEND EMAIL WITH CREDENTIALS
-                            try {
+                            // If record exists, update it; otherwise insert
+                            let empCatQuery;
+                            if (existingEmpCat.length > 0) {
+                              // Update existing record
+                              empCatQuery = `
+                                UPDATE employment_category 
+                                SET employmentCategory = ?
+                                WHERE employeeNumber = ?
+                              `;
+                            } else {
+                              // Insert new record
+                              empCatQuery = `
+                                INSERT INTO employment_category (employeeNumber, employmentCategory)
+                                VALUES (?, ?)
+                              `;
+                            }
+
+                            const empCatParams = existingEmpCat.length > 0
+                              ? [user.employmentCategory, user.employeeNumber]
+                              : [user.employeeNumber, user.employmentCategory];
+
+                            db.query(
+                              empCatQuery,
+                              empCatParams,
+                              async (catErr) => {
+                                if (catErr) {
+                                  errors.push(
+                                    `Error ${existingEmpCat.length > 0 ? 'updating' : 'inserting'} employment category ${user.employeeNumber}: ${catErr.message}`
+                                  );
+                                  // Rollback
+                                  db.query(
+                                    'DELETE FROM person_table WHERE agencyEmployeeNum = ?',
+                                    [user.employeeNumber]
+                                  );
+                                  db.query(
+                                    'DELETE FROM users WHERE employeeNumber = ?',
+                                    [user.employeeNumber]
+                                  );
+                                  return resolve();
+                                }
+
+                                // SEND EMAIL WITH CREDENTIALS
+                                try {
                               await transporter.sendMail({
                                 from: `"HRIS System" <${process.env.GMAIL_USER}>`,
                                 to: user.email,
@@ -696,12 +790,14 @@ router.post('/excel-register', async (req, res) => {
                               // Don't fail registration if email fails, just log it
                             }
 
-                            results.push({
-                              employeeNumber: user.employeeNumber,
-                              name: fullName,
-                              status: 'success',
-                            });
-                            resolve();
+                                results.push({
+                                  employeeNumber: user.employeeNumber,
+                                  name: fullName,
+                                  status: 'success',
+                                });
+                                resolve();
+                              }
+                            );
                           }
                         );
                       }
