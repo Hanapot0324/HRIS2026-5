@@ -1,7 +1,7 @@
 const db = require('../db');
 const express = require('express');
 const router = express.Router();
-const jwt = require('jsonwebtoken'); // add this near the top
+const jwt = require('jsonwebtoken');
 
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -17,8 +17,6 @@ function authenticateToken(req, res, next) {
     next();
   });
 }
-
-
 
 function logAudit(
   user,
@@ -48,14 +46,35 @@ function logAudit(
   );
 }
 
+// Helper function to format time
+const formatTime = (time) => {
+  if (!time) return null;
+  if (time.includes('AM') || time.includes('PM')) {
+    const [hour, minute, second] = time.split(/[: ]/);
+    const paddedHour = hour.padStart(2, '0');
+    return `${paddedHour}:${minute}:${second} ${time.slice(-2)}`;
+  }
+  const [hour, minute, second] = time.split(':');
+  const hour24 = parseInt(hour, 10);
+  const hour12 = hour24 % 12 || 12;
+  const ampm = hour24 < 12 ? 'AM' : 'PM';
+  return `${String(hour12).padStart(2, '0')}:${minute}:${second} ${ampm}`;
+};
+
+// Helper function to get day of week
+const getDayOfWeek = (dateString) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', { weekday: 'long' });
+};
+
 // Endpoint to fetch attendance records
 router.get('/api/attendance', authenticateToken, (req, res) => {
   const { personId, startDate, endDate } = req.query;
   const sql = `
     SELECT DISTINCT attendanceRecord.*, users.employeeNumber, users.username,
     users.employmentCategory, officialtime.*
-    FROM attendanceRecord 
-    JOIN users ON attendanceRecord.personID = users.employeeNumber 
+    FROM attendanceRecord
+    JOIN users ON attendanceRecord.personID = users.employeeNumber
     JOIN officialtime ON attendanceRecord.Day = officialtime.day AND attendancerecord.personID = officialtime.employeeID
     WHERE attendanceRecord.personID = ?
     AND attendanceRecord.date BETWEEN ? AND ?
@@ -129,9 +148,9 @@ router.post('/api/attendance', authenticateToken, (req, res) => {
   const { personID, startDate, endDate } = req.body;
 
   const query = `
-    SELECT PersonID, AttendanceDateTime, AttendanceState 
-    FROM AttendanceRecordInfo 
-    WHERE PersonID = ? 
+    SELECT PersonID, AttendanceDateTime, AttendanceState
+    FROM AttendanceRecordInfo
+    WHERE PersonID = ?
     AND AttendanceDateTime BETWEEN ? AND ?`;
 
   const startTimestamp = new Date(startDate).getTime();
@@ -175,12 +194,12 @@ router.post('/api/attendance', authenticateToken, (req, res) => {
   });
 });
 
-// Endpoint to fetch all attendance records with specific time columns
-router.post('/api/all-attendance', authenticateToken, (req, res) => {
+// NEW: Auto-save and fetch attendance records
+router.post('/api/all-attendance', authenticateToken, async (req, res) => {
   const { personID, startDate, endDate } = req.body;
 
   const query = `
-    SELECT 
+    SELECT
       PersonID, PersonName,
       DATE_FORMAT(FROM_UNIXTIME(AttendanceDateTime/1000), '%Y-%m-%d') AS Date,
       MIN(CASE WHEN AttendanceState = 1 THEN AttendanceDateTime END) AS Time1,
@@ -195,20 +214,22 @@ router.post('/api/all-attendance', authenticateToken, (req, res) => {
   const startTimestamp = new Date(startDate).getTime();
   const endTimestamp = new Date(endDate).getTime();
 
-  db.query(query, [personID, startTimestamp, endTimestamp], (err, results) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
+  db.query(
+    query,
+    [personID, startTimestamp, endTimestamp],
+    async (err, results) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
 
-    logAudit(
-      req.user,
-      'search',
-      'Device Attendance Records',
-      `${startDate} && ${endDate}`,
-      personID
-    );
+      logAudit(
+        req.user,
+        'search',
+        'Device Attendance Records',
+        `${startDate} && ${endDate}`,
+        personID
+      );
 
-    const records = results.map((record) => {
       const convertToManilaTime = (timestamp) => {
         if (!timestamp) return null;
         const date = new Date(timestamp);
@@ -225,7 +246,7 @@ router.post('/api/all-attendance', authenticateToken, (req, res) => {
           .split(', ')[1];
       };
 
-      return {
+      const records = results.map((record) => ({
         PersonID: record.PersonID,
         PersonName: record.PersonName,
         Date: record.Date,
@@ -233,14 +254,172 @@ router.post('/api/all-attendance', authenticateToken, (req, res) => {
         Time2: convertToManilaTime(record.Time2),
         Time3: convertToManilaTime(record.Time3),
         Time4: convertToManilaTime(record.Time4),
-      };
-    });
+      }));
 
-    res.json(records);
-  });
+      // AUTO-SAVE: Save records to attendanceRecord table
+      try {
+        for (const record of records) {
+          const checkSql = `SELECT id FROM attendanceRecord WHERE personID = ? AND date = ?`;
+          const existingRecord = await new Promise((resolve, reject) => {
+            db.query(
+              checkSql,
+              [record.PersonID, record.Date],
+              (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+              }
+            );
+          });
+
+          if (existingRecord.length === 0) {
+            // Insert new record
+            const insertSql = `
+            INSERT INTO attendanceRecord (personID, date, day, timeIN, breaktimeIN, breaktimeOUT, timeOUT)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `;
+            await new Promise((resolve, reject) => {
+              db.query(
+                insertSql,
+                [
+                  record.PersonID,
+                  record.Date,
+                  getDayOfWeek(record.Date),
+                  formatTime(record.Time1),
+                  formatTime(record.Time3),
+                  formatTime(record.Time2),
+                  formatTime(record.Time4),
+                ],
+                (err) => {
+                  if (err) reject(err);
+                  else {
+                    logAudit(
+                      req.user,
+                      'auto-create',
+                      'Device Attendance Auto-Save',
+                      record.Date,
+                      record.PersonID
+                    );
+                    resolve();
+                  }
+                }
+              );
+            });
+          }
+        }
+      } catch (saveError) {
+        console.error('Error auto-saving records:', saveError);
+        // Continue even if save fails
+      }
+
+      res.json(records);
+    }
+  );
 });
 
-// Endpoint to save attendance records
+// NEW: Send to DTR Module endpoint
+router.post('/api/send-to-dtr', authenticateToken, async (req, res) => {
+  const { personID, startDate, endDate } = req.body;
+
+  try {
+    // Check if records exist in attendanceRecord table
+    const checkQuery = `
+      SELECT COUNT(*) as count
+      FROM attendanceRecord
+      WHERE personID = ? AND date BETWEEN ? AND ?
+    `;
+
+    const recordCount = await new Promise((resolve, reject) => {
+      db.query(checkQuery, [personID, startDate, endDate], (err, result) => {
+        if (err) reject(err);
+        else resolve(result[0].count);
+      });
+    });
+
+    if (recordCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No attendance records found for this period',
+      });
+    }
+
+    logAudit(
+      req.user,
+      'send-to-dtr',
+      'Device Attendance Records',
+      `${startDate} && ${endDate}`,
+      personID
+    );
+
+    res.json({
+      success: true,
+      message: `Successfully prepared ${recordCount} records for DTR viewing`,
+      recordCount,
+    });
+  } catch (error) {
+    console.error('Error sending to DTR:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// NEW: Bulk send to DTR for multiple users
+router.post('/api/bulk-send-to-dtr', authenticateToken, async (req, res) => {
+  const { userIDs, startDate, endDate } = req.body;
+
+  if (!Array.isArray(userIDs) || userIDs.length === 0) {
+    return res
+      .status(400)
+      .json({ success: false, message: 'No users selected' });
+  }
+
+  try {
+    const results = [];
+
+    for (const personID of userIDs) {
+      const checkQuery = `
+        SELECT COUNT(*) as count
+        FROM attendanceRecord
+        WHERE personID = ? AND date BETWEEN ? AND ?
+      `;
+
+      const recordCount = await new Promise((resolve, reject) => {
+        db.query(checkQuery, [personID, startDate, endDate], (err, result) => {
+          if (err) reject(err);
+          else resolve(result[0].count);
+        });
+      });
+
+      results.push({
+        personID,
+        recordCount,
+        success: recordCount > 0,
+      });
+
+      if (recordCount > 0) {
+        logAudit(
+          req.user,
+          'bulk-send-to-dtr',
+          'Device Attendance Records',
+          `${startDate} && ${endDate}`,
+          personID
+        );
+      }
+    }
+
+    const successCount = results.filter((r) => r.success).length;
+    const totalRecords = results.reduce((sum, r) => sum + r.recordCount, 0);
+
+    res.json({
+      success: true,
+      message: `Successfully prepared DTR for ${successCount} users with ${totalRecords} total records`,
+      results,
+    });
+  } catch (error) {
+    console.error('Error bulk sending to DTR:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Endpoint to save attendance records (keep for manual saves if needed)
 router.post('/api/save-attendance', authenticateToken, (req, res) => {
   const { records } = req.body;
 
@@ -301,12 +480,12 @@ router.post('/api/view-attendance', authenticateToken, (req, res) => {
   const { personID, startDate, endDate } = req.body;
 
   const query = `
-    SELECT 
-      ar.personID, 
-      ar.date, 
-      DAYNAME(ar.date) AS Day, 
-      ar.timeIN, ar.breaktimeIN, ar.breaktimeOUT, ar.timeOUT, 
-      p.*, 
+    SELECT
+      ar.personID,
+      ar.date,
+      DAYNAME(ar.date) AS Day,
+      ar.timeIN, ar.breaktimeIN, ar.breaktimeOUT, ar.timeOUT,
+      p.*,
       ot.officialTimeIN, ot.officialTimeOUT
     FROM attendanceRecord ar
     INNER JOIN person_table p ON ar.personID = p.agencyEmployeeNum
@@ -385,11 +564,11 @@ router.get('/api/dtr', authenticateToken, (req, res) => {
   }
 
   const query = `
-    SELECT 
-      id, date, personID,  time 
-    FROM 
-      attendancerecord 
-    WHERE 
+    SELECT
+      id, date, personID, time
+    FROM
+      attendancerecord
+    WHERE
       personID = ? AND date BETWEEN ? AND ?
   `;
 
@@ -431,21 +610,13 @@ router.post('/api/overall_attendance', authenticateToken, (req, res) => {
 
   const query = `
     INSERT INTO overall_attendance_record (
-      personID, 
-      startDate, 
-      endDate, 
-      totalRenderedTimeMorning,
-      totalRenderedTimeMorningTardiness,
-      totalRenderedTimeAfternoon,
-      totalRenderedTimeAfternoonTardiness,
-      totalRenderedHonorarium,
-      totalRenderedHonorariumTardiness,
-      totalRenderedServiceCredit,
-      totalRenderedServiceCreditTardiness,
-      totalRenderedOvertime,
-      totalRenderedOvertimeTardiness,
-      overallRenderedOfficialTime,
-      overallRenderedOfficialTimeTardiness
+      personID, startDate, endDate,
+      totalRenderedTimeMorning, totalRenderedTimeMorningTardiness,
+      totalRenderedTimeAfternoon, totalRenderedTimeAfternoonTardiness,
+      totalRenderedHonorarium, totalRenderedHonorariumTardiness,
+      totalRenderedServiceCredit, totalRenderedServiceCreditTardiness,
+      totalRenderedOvertime, totalRenderedOvertimeTardiness,
+      overallRenderedOfficialTime, overallRenderedOfficialTimeTardiness
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
@@ -480,10 +651,12 @@ router.post('/api/overall_attendance', authenticateToken, (req, res) => {
         `${startDate} && ${endDate}`,
         personID
       );
-      res.status(201).json({
-        message: 'Attendance record saved successfully',
-        data: results,
-      });
+      res
+        .status(201)
+        .json({
+          message: 'Attendance record saved successfully',
+          data: results,
+        });
     }
   );
 });
@@ -491,23 +664,22 @@ router.post('/api/overall_attendance', authenticateToken, (req, res) => {
 // Fetch overall attendance record
 router.get('/api/overall_attendance_record', authenticateToken, (req, res) => {
   const { personID, startDate, endDate } = req.query;
-  console.log('Received parameters:', { personID, startDate, endDate });
 
   const query = `
-   SELECT 
-  overall_attendance_record.*, 
-  department_assignment.code 
-FROM 
-  overall_attendance_record
-LEFT JOIN 
-  department_assignment 
-ON 
-  department_assignment.employeeNumber = overall_attendance_record.personID
-WHERE 
-  overall_attendance_record.personID = ? 
-  AND overall_attendance_record.startDate >= ? 
-  AND overall_attendance_record.endDate <= ?
-`;
+    SELECT
+      overall_attendance_record.*,
+      department_assignment.code
+    FROM
+      overall_attendance_record
+    LEFT JOIN
+      department_assignment
+    ON
+      department_assignment.employeeNumber = overall_attendance_record.personID
+    WHERE
+      overall_attendance_record.personID = ?
+      AND overall_attendance_record.startDate >= ?
+      AND overall_attendance_record.endDate <= ?
+  `;
 
   db.query(query, [personID, startDate, endDate], (error, results) => {
     if (error) {
@@ -521,10 +693,12 @@ WHERE
       `${startDate} && ${endDate}`,
       personID
     );
-    res.status(200).json({
-      message: 'Overall attendance record fetched successfully',
-      data: results,
-    });
+    res
+      .status(200)
+      .json({
+        message: 'Overall attendance record fetched successfully',
+        data: results,
+      });
   });
 });
 
@@ -553,52 +727,40 @@ router.put(
 
     const { id } = req.params;
 
-    const checkQuery = `
-    SELECT * FROM overall_attendance_record WHERE personID = ? AND startDate = ? AND endDate = ? AND id != ?;
-  `;
-    console.log('Checking for duplicates with', {
-      personID,
-      startDate,
-      endDate,
-      id,
-    });
+    const checkQuery = `SELECT * FROM overall_attendance_record WHERE personID = ? AND startDate = ? AND endDate = ? AND id != ?`;
 
     db.query(
       checkQuery,
       [personID, startDate, endDate, id],
       (checkError, checkResults) => {
         if (checkError) {
-          return res.status(500).json({
-            message: 'Database error while checking for duplicates',
-            error: checkError,
-          });
+          return res
+            .status(500)
+            .json({
+              message: 'Database error while checking for duplicates',
+              error: checkError,
+            });
         }
 
         if (checkResults.length > 0) {
-          return res.status(400).json({
-            message:
-              'Duplicate record found with the same personID, startDate, and endDate',
-          });
+          return res
+            .status(400)
+            .json({
+              message:
+                'Duplicate record found with the same personID, startDate, and endDate',
+            });
         }
 
         const query = `
       UPDATE overall_attendance_record SET
-      personID = ?, 
-      startDate = ?, 
-      endDate = ?, 
-      totalRenderedTimeMorning = ?, 
-      totalRenderedTimeMorningTardiness = ?, 
-      totalRenderedTimeAfternoon = ?, 
-      totalRenderedTimeAfternoonTardiness = ?, 
-      totalRenderedHonorarium = ?, 
-      totalRenderedHonorariumTardiness = ?, 
-      totalRenderedServiceCredit = ?, 
-      totalRenderedServiceCreditTardiness = ?, 
-      totalRenderedOvertime = ?, 
-      totalRenderedOvertimeTardiness = ?, 
-      overallRenderedOfficialTime = ?, 
-      overallRenderedOfficialTimeTardiness = ? 
-      WHERE id = ?;
+      personID = ?, startDate = ?, endDate = ?,
+      totalRenderedTimeMorning = ?, totalRenderedTimeMorningTardiness = ?,
+      totalRenderedTimeAfternoon = ?, totalRenderedTimeAfternoonTardiness = ?,
+      totalRenderedHonorarium = ?, totalRenderedHonorariumTardiness = ?,
+      totalRenderedServiceCredit = ?, totalRenderedServiceCreditTardiness = ?,
+      totalRenderedOvertime = ?, totalRenderedOvertimeTardiness = ?,
+      overallRenderedOfficialTime = ?, overallRenderedOfficialTimeTardiness = ?
+      WHERE id = ?
     `;
 
         db.query(
@@ -650,10 +812,7 @@ router.delete(
   (req, res) => {
     const { id, personID } = req.params;
 
-    const query = `
-    DELETE FROM overall_attendance_record 
-    WHERE id = ? AND personID = ?
-  `;
+    const query = `DELETE FROM overall_attendance_record WHERE id = ? AND personID = ?`;
 
     db.query(query, [id, personID], (err, result) => {
       if (err) {
@@ -662,9 +821,11 @@ router.delete(
       }
 
       if (result.affectedRows === 0) {
-        return res.status(404).send({
-          message: 'Attendance record not found or personID mismatch',
-        });
+        return res
+          .status(404)
+          .send({
+            message: 'Attendance record not found or personID mismatch',
+          });
       }
 
       logAudit(req.user, 'delete', 'overall_attendance_record', id, personID);
@@ -688,21 +849,15 @@ router.post('/api/attendance-records', authenticateToken, (req, res) => {
   const { personID, startDate, endDate } = req.body;
 
   if (!personID || !startDate || !endDate) {
-    return res.status(400).json({
-      error: 'personID, startDate, and endDate are required',
-    });
+    return res
+      .status(400)
+      .json({ error: 'personID, startDate, and endDate are required' });
   }
 
   const sql = `
-    SELECT 
-      id,
-      personID,
-      date,
-      Day,
-      timeIN,
-      breaktimeIN,
-      breaktimeOUT,
-      timeOUT
+    SELECT
+      id, personID, date, Day,
+      timeIN, breaktimeIN, breaktimeOUT, timeOUT
     FROM attendancerecord
     WHERE personID = ?
       AND date >= ?
@@ -713,31 +868,40 @@ router.post('/api/attendance-records', authenticateToken, (req, res) => {
   db.query(sql, [personID, startDate, endDate], (err, result) => {
     if (err) {
       console.error('Error fetching attendance records:', err);
-      return res.status(500).json({
-        message: 'Error fetching attendance records',
-      });
+      return res
+        .status(500)
+        .json({ message: 'Error fetching attendance records' });
     }
-
     res.json(result);
   });
 });
 
-// GET /attendance/monthly?month=2025-09
+// GET /attendance/monthly - Monthly attendance statistics
 router.get('/attendance/monthly', authenticateToken, (req, res) => {
-  // for now, just hardcode September 2025
-  const startDate = '2025-09-01';
-  const endDate = '2025-09-30';
+  const { month } = req.query;
+
+  // Default to September 2025 if no month provided
+  let startDate = '2025-09-01';
+  let endDate = '2025-09-30';
+
+  if (month) {
+    // Parse month parameter (expected format: YYYY-MM)
+    const [year, monthNum] = month.split('-');
+    const lastDay = new Date(year, monthNum, 0).getDate();
+    startDate = `${year}-${monthNum}-01`;
+    endDate = `${year}-${monthNum}-${lastDay}`;
+  }
 
   const sql = `
     SELECT DATE(Date) as day, COUNT(DISTINCT PersonID) as present
     FROM AttendanceRecordInfo
-    WHERE AttendanceState = 1 
+    WHERE AttendanceState = 1
       AND Date BETWEEN ? AND ?
     GROUP BY DATE(Date)
     ORDER BY day ASC
   `;
 
-  earistDb.query(sql, [startDate, endDate], (err, results) => {
+  db.query(sql, [startDate, endDate], (err, results) => {
     if (err) {
       console.error('Error fetching monthly attendance:', err);
       return res.status(500).json({ error: 'Database error' });
@@ -746,4 +910,354 @@ router.get('/attendance/monthly', authenticateToken, (req, res) => {
   });
 });
 
+// NEW: Get all unique PersonIDs from attendancerecordinfo (not just registered users)
+router.get('/api/all-device-users', authenticateToken, (req, res) => {
+  const query = `
+    SELECT DISTINCT
+      PersonID,
+      PersonName,
+      MIN(AttendanceDateTime) as firstSeen,
+      MAX(AttendanceDateTime) as lastSeen
+    FROM AttendanceRecordInfo
+    GROUP BY PersonID, PersonName
+    ORDER BY PersonName ASC
+  `;
+
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('Error fetching device users:', err);
+      return res.status(500).json({ error: err.message });
+    }
+
+    logAudit(req.user, 'view', 'Device Users List', null, null);
+    res.json(results);
+  });
+});
+
+// IMPROVED: Auto-save and fetch attendance records with better date handling
+router.post('/api/all-attendance', authenticateToken, async (req, res) => {
+  const { personID, startDate, endDate } = req.body;
+
+  // Convert dates to timestamps (UTC)
+  const startTimestamp = new Date(startDate + 'T00:00:00Z').getTime();
+  const endTimestamp = new Date(endDate + 'T23:59:59Z').getTime();
+
+  const query = `
+    SELECT
+      PersonID, PersonName,
+      DATE_FORMAT(FROM_UNIXTIME(AttendanceDateTime/1000), '%Y-%m-%d') AS Date,
+      MIN(CASE WHEN AttendanceState = 1 THEN AttendanceDateTime END) AS Time1,
+      MIN(CASE WHEN AttendanceState = 2 THEN AttendanceDateTime END) AS Time2,
+      MIN(CASE WHEN AttendanceState = 3 THEN AttendanceDateTime END) AS Time3,
+      MAX(CASE WHEN AttendanceState = 4 THEN AttendanceDateTime END) AS Time4
+    FROM AttendanceRecordInfo
+    WHERE PersonID = ? AND AttendanceDateTime BETWEEN ? AND ?
+    GROUP BY Date, PersonID, PersonName
+    ORDER BY Date ASC
+  `;
+
+  db.query(
+    query,
+    [personID, startTimestamp, endTimestamp],
+    async (err, results) => {
+      if (err) {
+        console.error('Error fetching attendance:', err);
+        return res.status(500).json({ error: err.message });
+      }
+
+      logAudit(
+        req.user,
+        'search',
+        'Device Attendance Records',
+        `${startDate} && ${endDate}`,
+        personID
+      );
+
+      const convertToManilaTime = (timestamp) => {
+        if (!timestamp) return null;
+        const date = new Date(timestamp);
+        return date.toLocaleString('en-PH', {
+          timeZone: 'Asia/Manila',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true,
+        });
+      };
+
+      const records = results.map((record) => ({
+        PersonID: record.PersonID,
+        PersonName: record.PersonName,
+        Date: record.Date,
+        Time1: convertToManilaTime(record.Time1),
+        Time2: convertToManilaTime(record.Time2),
+        Time3: convertToManilaTime(record.Time3),
+        Time4: convertToManilaTime(record.Time4),
+      }));
+
+      // AUTO-SAVE: Save records to attendanceRecord table
+      try {
+        for (const record of records) {
+          const checkSql = `SELECT id FROM attendanceRecord WHERE personID = ? AND date = ?`;
+          const existingRecord = await new Promise((resolve, reject) => {
+            db.query(
+              checkSql,
+              [record.PersonID, record.Date],
+              (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+              }
+            );
+          });
+
+          if (existingRecord.length === 0) {
+            // Insert new record
+            const insertSql = `
+            INSERT INTO attendanceRecord (personID, date, day, timeIN, breaktimeIN, breaktimeOUT, timeOUT)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `;
+            await new Promise((resolve, reject) => {
+              db.query(
+                insertSql,
+                [
+                  record.PersonID,
+                  record.Date,
+                  getDayOfWeek(record.Date),
+                  formatTime(record.Time1),
+                  formatTime(record.Time3),
+                  formatTime(record.Time2),
+                  formatTime(record.Time4),
+                ],
+                (err) => {
+                  if (err) {
+                    console.error('Error auto-saving record:', err);
+                    reject(err);
+                  } else {
+                    logAudit(
+                      req.user,
+                      'auto-create',
+                      'Device Attendance Auto-Save',
+                      record.Date,
+                      record.PersonID
+                    );
+                    resolve();
+                  }
+                }
+              );
+            });
+          } else {
+            // UPDATE existing record to keep data fresh
+            const updateSql = `
+            UPDATE attendanceRecord
+            SET timeIN = ?, breaktimeIN = ?, breaktimeOUT = ?, timeOUT = ?, day = ?
+            WHERE personID = ? AND date = ?
+          `;
+            await new Promise((resolve, reject) => {
+              db.query(
+                updateSql,
+                [
+                  formatTime(record.Time1),
+                  formatTime(record.Time3),
+                  formatTime(record.Time2),
+                  formatTime(record.Time4),
+                  getDayOfWeek(record.Date),
+                  record.PersonID,
+                  record.Date,
+                ],
+                (err) => {
+                  if (err) {
+                    console.error('Error updating record:', err);
+                    reject(err);
+                  } else {
+                    logAudit(
+                      req.user,
+                      'auto-update',
+                      'Device Attendance Auto-Save',
+                      record.Date,
+                      record.PersonID
+                    );
+                    resolve();
+                  }
+                }
+              );
+            });
+          }
+        }
+      } catch (saveError) {
+        console.error('Error auto-saving records:', saveError);
+        // Continue even if save fails
+      }
+
+      res.json(records);
+    }
+  );
+});
+
+// NEW: Bulk auto-save for all users in date range
+router.post('/api/bulk-auto-save', authenticateToken, async (req, res) => {
+  const { startDate, endDate } = req.body;
+
+  if (!startDate || !endDate) {
+    return res
+      .status(400)
+      .json({ error: 'Start date and end date are required' });
+  }
+
+  try {
+    // Get all unique PersonIDs from device
+    const getAllUsersQuery = `
+      SELECT DISTINCT PersonID, PersonName
+      FROM AttendanceRecordInfo
+    `;
+
+    const allUsers = await new Promise((resolve, reject) => {
+      db.query(getAllUsersQuery, (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      });
+    });
+
+    let savedCount = 0;
+    let updatedCount = 0;
+    let errorCount = 0;
+
+    // Process each user
+    for (const user of allUsers) {
+      try {
+        const startTimestamp = new Date(startDate + 'T00:00:00Z').getTime();
+        const endTimestamp = new Date(endDate + 'T23:59:59Z').getTime();
+
+        const query = `
+          SELECT
+            PersonID, PersonName,
+            DATE_FORMAT(FROM_UNIXTIME(AttendanceDateTime/1000), '%Y-%m-%d') AS Date,
+            MIN(CASE WHEN AttendanceState = 1 THEN AttendanceDateTime END) AS Time1,
+            MIN(CASE WHEN AttendanceState = 2 THEN AttendanceDateTime END) AS Time2,
+            MIN(CASE WHEN AttendanceState = 3 THEN AttendanceDateTime END) AS Time3,
+            MAX(CASE WHEN AttendanceState = 4 THEN AttendanceDateTime END) AS Time4
+          FROM AttendanceRecordInfo
+          WHERE PersonID = ? AND AttendanceDateTime BETWEEN ? AND ?
+          GROUP BY Date, PersonID, PersonName
+        `;
+
+        const records = await new Promise((resolve, reject) => {
+          db.query(
+            query,
+            [user.PersonID, startTimestamp, endTimestamp],
+            (err, result) => {
+              if (err) reject(err);
+              else resolve(result);
+            }
+          );
+        });
+
+        const convertToManilaTime = (timestamp) => {
+          if (!timestamp) return null;
+          const date = new Date(timestamp);
+          return date.toLocaleString('en-PH', {
+            timeZone: 'Asia/Manila',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true,
+          });
+        };
+
+        for (const record of records) {
+          const checkSql = `SELECT id FROM attendanceRecord WHERE personID = ? AND date = ?`;
+          const existingRecord = await new Promise((resolve, reject) => {
+            db.query(
+              checkSql,
+              [record.PersonID, record.Date],
+              (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+              }
+            );
+          });
+
+          if (existingRecord.length === 0) {
+            const insertSql = `
+              INSERT INTO attendanceRecord (personID, date, day, timeIN, breaktimeIN, breaktimeOUT, timeOUT)
+              VALUES (?, ?, ?, ?, ?, ?, ?)
+            `;
+            await new Promise((resolve, reject) => {
+              db.query(
+                insertSql,
+                [
+                  record.PersonID,
+                  record.Date,
+                  getDayOfWeek(record.Date),
+                  formatTime(convertToManilaTime(record.Time1)),
+                  formatTime(convertToManilaTime(record.Time3)),
+                  formatTime(convertToManilaTime(record.Time2)),
+                  formatTime(convertToManilaTime(record.Time4)),
+                ],
+                (err) => {
+                  if (err) reject(err);
+                  else {
+                    savedCount++;
+                    resolve();
+                  }
+                }
+              );
+            });
+          } else {
+            const updateSql = `
+              UPDATE attendanceRecord
+              SET timeIN = ?, breaktimeIN = ?, breaktimeOUT = ?, timeOUT = ?, day = ?
+              WHERE personID = ? AND date = ?
+            `;
+            await new Promise((resolve, reject) => {
+              db.query(
+                updateSql,
+                [
+                  formatTime(convertToManilaTime(record.Time1)),
+                  formatTime(convertToManilaTime(record.Time3)),
+                  formatTime(convertToManilaTime(record.Time2)),
+                  formatTime(convertToManilaTime(record.Time4)),
+                  getDayOfWeek(record.Date),
+                  record.PersonID,
+                  record.Date,
+                ],
+                (err) => {
+                  if (err) reject(err);
+                  else {
+                    updatedCount++;
+                    resolve();
+                  }
+                }
+              );
+            });
+          }
+        }
+      } catch (userError) {
+        console.error(`Error processing user ${user.PersonID}:`, userError);
+        errorCount++;
+      }
+    }
+
+    logAudit(
+      req.user,
+      'bulk-auto-save',
+      'Device Attendance Records',
+      `${startDate} && ${endDate}`,
+      null
+    );
+
+    res.json({
+      success: true,
+      message: `Processed ${allUsers.length} users: ${savedCount} new records saved, ${updatedCount} records updated${errorCount > 0 ? `, ${errorCount} errors` : ''}`,
+      stats: {
+        totalUsers: allUsers.length,
+        saved: savedCount,
+        updated: updatedCount,
+        errors: errorCount,
+      },
+    });
+  } catch (error) {
+    console.error('Error in bulk auto-save:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 module.exports = router;
